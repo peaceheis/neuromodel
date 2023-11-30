@@ -4,7 +4,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-T_TOTAL = 10  # (sec)
+T_TOTAL = 1  # (sec)
 DELTA_T = .001  # (sec)
 
 C_M = 1 * (10 ** -6)  # General Membrane Conductance (F/cm^2)
