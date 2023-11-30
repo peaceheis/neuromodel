@@ -65,6 +65,17 @@ class Neuron:
         beta_m = self.beta_m()
         beta_h = self.beta_h()
         beta_n = self.beta_n()
+        #dmdt = (alpha_m*(1-m)) - (beta_m*m)
+        #dndt = (alpha_n*(1-n)) - (beta_n*n)
+        #dhdt = (alpha_h*(1-h)) - (beta_h*h)
+
+        #alpha_m = (.02*(V_m-25)/(1-np.e**(-1*(V_m-25)/9)))
+        #alpha_n=.182*(V_m+35)/(1-np.e**(-1*(V_m-35)/9))
+        #alpha_h = .25*np.e**(-1*(V_m+90)/12)
+        
+        #beta_m = (-.0002*(V_m-25)/(1-np.e**(-1*(V_m-25)/9)))
+        #beta_n = -.124*(V_m+35)/(1-np.e**(-1*(V_m-35)/9))
+        #beta_h = .25*np.e**((V_m+62)/6)/np.e**((V_m+90)/12)
 
 
 
