@@ -4,7 +4,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-T_TOTAL = 1  # (sec)
+T_TOTAL = 10  # (sec)
 DELTA_T = .001  # (sec)
 
 C_M = 1 * (10 ** -6)  # General Membrane Conductance (F/cm^2)
@@ -13,7 +13,7 @@ TEMP = 18  # temperature for the psi expression?
 
 # Equilibrium Potential Constants (mV)
 E_NA = 55  # Sodium Channel Equilibrium
-E_K = -77  # Potassium Channel Equilibrium
+E_K = -90  # Potassium Channel Equilibrium
 E_L = -65  # Leak Channel Equilibrium
 V_REST = -70  # Rest Voltage
 
@@ -24,7 +24,7 @@ G_L_MAX = .3  # Leak
 
 # Initial Parameters (all placeholder for now)
 V_m = V_REST
-num_iterations = T_TOTAL / DELTA_T
+NUM_STEPS = int(T_TOTAL / DELTA_T)
 
 
 class Neuron:
@@ -35,15 +35,15 @@ class Neuron:
 
         # sodium activation variable
         self.m_prev: float = 0
-        self.m_current: float = 0
+        self.m_current: float = 0.2
 
         # sodium inactivation variable
         self.h_prev: float = 0
-        self.h_current: float = 0
+        self.h_current: float = 0.5
 
         # k activation variable
         self.n_prev: float = 0
-        self.n_current: float = 0
+        self.n_current: float = 1
 
         # membrane voltage
         self.v_prev: float = V_REST
@@ -58,15 +58,15 @@ class Neuron:
     def update(self, delta_t: float):
         self.voltages.append(self.v_current)
 
-        alpha_m = self.alpha_m()
-        alpha_h = self.alpha_h()
-        alpha_n = self.alpha_n()
+        self.v_prev = self.v_current
+        self.m_prev = self.m_current
+        self.h_prev = self.h_current
+        self.n_prev = self.n_current
 
-        beta_m = self.beta_m()
-        beta_h = self.beta_h()
-        beta_n = self.beta_n()
-
-
+        self.v_current = self.v_prev + self.dv_dt()*delta_t
+        self.m_current = self.m_prev + self.dm_dt(self.m_prev)*delta_t
+        self.h_current = self.h_prev + self.dh_dt(self.h_prev)*delta_t
+        self.n_current = self.n_prev + self.dn_dt(self.n_prev)*delta_t
 
 
     def dv_dt(self) -> float:
@@ -168,67 +168,14 @@ class Neuron:
         return 0.125 * self.phi * math.exp(-self.membrane_potential / 80)
 
 
-# Functions
-def current(g: int, V: int, E: int) -> float:
-    return g * (V - E)
-
-
-# Dependent Variables
-g_k = G_K_MAX * k_activation ** 4
-g_na = G_NA_MAX * na_inactivation * na_activation ** 3
-delta_V = V_m - V_REST
-I_k = current(g_k, V_m, E_K)
-I_Na = current(g_na, V_m, E_NA)
-I_L = current(G_L_MAX, V_m, E_L)
-psi = 3 ** ((TEMP - 6.3) / 10)
-alpha_m = (psi * (2.5 - (.1 * delta_V))) / (-1 + np.e ** (2.5 - (.1 * delta_V)))
-alpha_n = (psi * (.1 - (.01 * delta_V))) / (-1 + np.e ** (1 - (.1 * delta_V)))
-alpha_h = 0.07 * psi * (np.e ** (-delta_V / 20))
-beta_m = 4 * psi * (np.e ** (-delta_V / 20))
-beta_n = .125 * psi * (np.e ** (-delta_V / 80))
-beta_h = psi / (1 + (np.e ** (3 - (.1 * delta_V))))
-m_infinity = alpha_m / (alpha_m + beta_m)
-n_infinity = alpha_n / (alpha_n + beta_n)
-h_infinity = alpha_h / (alpha_h + beta_h)
-
-tao_m = 1 / (alpha_m + beta_m)
-tao_n = 1 / (alpha_m + beta_m)
-tao_h = 1 / (alpha_h + beta_h)
-
-dmdt = (1 / tao_m) * (m_infinity - na_activation)
-dndt = (1 / tao_n) * (n_infinity - k_activation)
-dhdt = (1 / tao_h) * (h_infinity - na_inactivation)
-dvdt = -(I_k + I_L + I_Na)
-x = np.linspace(0, 10, 10000)
+neuron = Neuron(9.0)
+x = np.linspace(0, 10, NUM_STEPS)
 Voltage = []
-n_vals = []
-for i in range(10000):
-    V_m = V_m + (DELTA_T * dvdt)
-    na_activation = na_activation + (DELTA_T * dmdt)
-    k_activation = k_activation + (DELTA_T * dndt)
-    na_inactivation = na_inactivation + (DELTA_T + dhdt)
-    I_k = current(g_k, V_m, E_K)
-    I_Na = current(g_na, V_m, E_NA)
-    I_L = current(G_L_MAX, V_m, E_L)
-    g_k = G_K_MAX * (k_activation ** 4)
-    g_na = G_NA_MAX * na_inactivation * (na_activation ** 3)
-    tao_m = 1 / (alpha_m + beta_m)
-    tao_n = 1 / (alpha_m + beta_m)
-    tao_h = 1 / (alpha_h + beta_h)
-    m_infinity = alpha_m / (alpha_m + beta_m)
-    n_infinity = alpha_n / (alpha_n + beta_n)
-    h_infinity = alpha_h / (alpha_h + beta_h)
-    dmdt = (1 / tao_m) * (m_infinity - na_activation)
-    dndt = (1 / tao_n) * (n_infinity - k_activation)
-    dhdt = (1 / tao_h) * (h_infinity - na_inactivation)
-    dvdt = -(I_k + I_L + I_Na)
-    alpha_m = (psi * (2.5 - (.1 * delta_V))) / (-1 + np.e ** (2.5 - (.1 * delta_V)))
-    alpha_n = (psi * (.1 - (.01 * delta_V))) / (-1 + np.e ** (1 - (.1 * delta_V)))
-    alpha_h = 0.07 * psi * (np.e ** (-delta_V / 20))
-    beta_m = 4 * psi * (np.e ** (-delta_V / 20))
-    beta_n = .125 * psi * (np.e ** (-delta_V / 80))
-    beta_h = psi / (1 + (np.e ** (3 - (.1 * delta_V))))
-    Voltage.append(V_m)
-    n_vals.append(k_activation)
-plt.plot(x, Voltage)
+
+for _ in range(NUM_STEPS):
+    neuron.update(DELTA_T)
+
+plt.plot(x, neuron.voltages)
 plt.show()
+
+print(neuron.voltages)
