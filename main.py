@@ -58,6 +58,16 @@ class Neuron:
     def update(self, delta_t: float):
         self.voltages.append(self.v_current)
 
+        alpha_m = self.alpha_m()
+        alpha_h = self.alpha_h()
+        alpha_n = self.alpha_n()
+
+        beta_m = self.beta_m()
+        beta_h = self.beta_h()
+        beta_n = self.beta_n()
+
+
+
 
     def dv_dt(self) -> float:
         """voltage rate of change"""
