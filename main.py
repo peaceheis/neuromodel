@@ -112,18 +112,18 @@ class Neuron:
 
     def dm_dt(self, m: float) -> float:
         """sodium gate activation rate function"""
-        return 1 / (self.tau_m() * (self.m_infinity() - m))
-
+        #return 1 / (self.tau_m() * (self.m_infinity() - m))
+        return alpha_m (1-self.m_prev) - beta_m * self.m_prev
     def dh_dt(self, h: float) -> float:
         """sodium gate inactivation rate function"""
-        return 1 / (self.tau_h() * (self.h_infinity() - h))
-
+        #return 1 / (self.tau_h() * (self.h_infinity() - h))
+        return alpha_n * (1-self.n_prev) - beta_n * self.n_prev
     def dn_dt(self, n: float) -> float:
         """potassium gate activation rate function"""
-        return 1 / (self.tau_n() * (self.n_infinity() - n))
-
+        #return 1 / (self.tau_n() * (self.n_infinity() - n))
+        return alpha_h * (1-self.h_prev) - beta_h * self.h_prev
     # gate variable steady state functions
-
+'''
     def m_infinity(self) -> float:
         """sodium activation gate steady state function"""
         return self.alpha_m() / (self.alpha_m() + self.beta_m())
@@ -149,35 +149,36 @@ class Neuron:
     def tau_n(self) -> float:
         """potassium activation time constant function"""
         return 1 / (self.alpha_n() + self.beta_n())
-
+'''
     # alpha (closed to open state) transition rate functions
 
     def alpha_m(self) -> float:
         """sodium activation gate opening transition rate function"""
-        return self.phi * (2.5 - 0.1 * self.membrane_potential) / (math.exp(2.5 - 0.1 * self.membrane_potential) + 1)
+        #return self.phi * (2.5 - 0.1 * self.membrane_potential) / (math.exp(2.5 - 0.1 * self.membrane_potential) + 1)
+        return (.1*(25-V_m))/(np.e((25-V_m)/10)-1)  
 
     def alpha_h(self) -> float:
         """sodium inactivation gate opening transition rate function"""
-        return 0.07 * self.phi * math.exp(-self.membrane_potential / 20)
-
+        #return 0.07 * self.phi * math.exp(-self.membrane_potential / 20)
+        return .07*np.e(-V_m/20)
     def alpha_n(self) -> float:
         """potassium activation gate opening transition rate function"""
-        return self.phi * (0.1 - 0.01 * self.membrane_potential) / (math.exp(1 - 0.1 * self.membrane_potential) - 1)
-
+        #return self.phi * (0.1 - 0.01 * self.membrane_potential) / (math.exp(1 - 0.1 * self.membrane_potential) - 1)
+        return (.01*(10-V_m))/(np.e((10-V_m)/10)-1)
     # beta (open to closed state) transition rate functions
 
     def beta_m(self) -> float:
         """sodium activation gate closing transition rate function"""
-        return 4 * self.phi * math.exp(-self.membrane_potential / 20)
-
+        #return 4 * self.phi * math.exp(-self.membrane_potential / 20)
+        return 4*np.e(-V_m/18)
     def beta_h(self) -> float:
         """sodium inactivation gate closing transition rate function"""
-        return self.phi / (math.exp(3.0 - 0.1 * self.membrane_potential) + 1)
-
+        #return self.phi / (math.exp(3.0 - 0.1 * self.membrane_potential) + 1)
+        return 1/(np.e((30-V_m)/10)+1)
     def beta_n(self) -> float:
         """potassium activation gate closing transition rate function"""
-        return 0.125 * self.phi * math.exp(-self.membrane_potential / 80)
-
+        #return 0.125 * self.phi * math.exp(-self.membrane_potential / 80)
+        return .125*np.e(-V_m/80)
 
 # Functions
 def current(g: int, V: int, E: int) -> float:
