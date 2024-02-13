@@ -1,5 +1,4 @@
-
-from enum import Enum, EnumType
+import math
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,7 +19,7 @@ class Neuron:
     V_L = 0.0
     V_EXC = 14 / 3
     V_STIM = 14 / 3
-    V_SK = - 2/3
+    V_SK = - 2 / 3
     V_INH = -2 / 3
     V_THRES = 1
     # tau values in milliseconds
@@ -201,13 +200,46 @@ class Neuron:
             else:
                 return
 
+    def generate_firing_rates(self, duration, bin_size):
+        if duration % bin_size != 0:
+            raise Exception("bin size should divide duration")
+
+        num_bins = int(duration / bin_size)
+
+        if num_bins <= 1:
+            return [len(self.spike_times) / duration]
+
+        # partition spike_counts into bins
+        maxes = np.linspace(bin_size, duration, num=bin_size)
+
+        bins = []
+
+        index = 0
+        for max_ in maxes:
+            bin_ = []
+            while index < len(self.spike_times):
+                if spike := self.spike_times[index] < max_:
+                    bin_.append(spike)
+                index += 1
+
+            bins.append(bin_)
+
+
+        rates = []
+        for bin_ in bins:
+            rates.append(len(bin_) / bin_size * (1 / 1000))  # (adjusted for fires / sec)
+
+        return rates
+
     def render(self, vals: np.linspace):
         """creates a pyplot visualization of the voltage values"""
         plt.figure(figsize=(6.4, 4.8))
-        plt.title(f"Spike Count - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
+        plt.title(
+            f"Spike Count - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.spike_counts, color="red" if self.neuron_type == "LN" else "blue")
         plt.figure()
-        plt.title(f"Voltage - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
+        plt.title(
+            f"Voltage - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
         plt.show()
         pass
@@ -274,6 +306,8 @@ class Glomerulus:
         self.lambda_mech_factor = lambda_mech
         self.pns: list[Neuron] = [Neuron(stim_time, lambda_odor, lambda_mech, "PN", neuron_id=i) for i in range(1, 11)]
         self.lns: list[Neuron] = [Neuron(stim_time, lambda_odor, lambda_mech, "LN", neuron_id=j) for j in range(11, 17)]
+        self.neurons = self.pns
+        self.neurons.extend(self.lns)
 
         print(f"{len(self.pns)}, {len(self.lns)}")
 
@@ -308,15 +342,34 @@ class Glomerulus:
                     ln.connected_neurons.append(pn)
 
     def get_neurons(self):
-        neurons = self.pns
-        neurons.extend(self.lns)
-        return neurons
+        return self.neurons
 
     def update(self):
-        for pn in self.pns:
-            pn.update()
-        for ln in self.lns:
-            ln.update()
+        for neuron in self.neurons:
+            neuron.update()
+
+    def get_normalized_average_firing_rates(self, duration, bin_size):
+        """Returns normalized average firing rates for given time intervals, with PNs being returned first."""
+        pn_firing_rates = [pn.generate_firing_rates(duration, bin_size) for pn in self.pns]
+        ln_firing_rates = [ln.generate_firing_rates(duration, bin_size) for ln in self.lns]
+
+        avg_pn_firing_rates = []
+        avg_ln_firing_rates = []
+
+        for i in range(len(pn_firing_rates)):
+            avg_pn_firing_rates.append(np.average([rates[i] for rates in pn_firing_rates]))
+            avg_ln_firing_rates.append(np.average([rates[i] for rates in ln_firing_rates]))
+
+        pn_bg = avg_pn_firing_rates[0]
+        normalized_avg_pn_firing_rates = [rate/pn_bg for rate in avg_pn_firing_rates ]
+
+        ln_bg = avg_pn_firing_rates[0]
+        normalized_avg_ln_firing_rates = [rate / ln_bg for rate in avg_ln_firing_rates]
+
+        return normalized_avg_pn_firing_rates, normalized_avg_ln_firing_rates
+
+
+
 
 
 class Network:
@@ -357,13 +410,15 @@ class Network:
         for glomerulus in self.glomeruli:
             glomerulus.update()
 
+
 duration = 250
 stim_time = 50
+bin_size = 50
 steps = int(duration / DELTA_T)
 
 network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
-vals = np.linspace(0, duration, steps) #linspace for iteration of the network
+vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
 
 for val in vals:
     network.update()
@@ -372,15 +427,37 @@ for val in vals:
 # for neuron in network.glomeruli[0].get_neurons():
 #     neuron.render(vals)
 
+
+
 for i, glomerulus in enumerate(network.glomeruli):
     data = []
     for neuron in glomerulus.get_neurons():
         data.append(neuron.spike_times)
 
-    plt.figure(figsize=(10, 7.5))
+    plt.figure(i, figsize=(10, 7.5))
     plt.title(f"Glomerulus {i} Eventplot")
     plt.eventplot(data, colors="red")
+
+    pn_rates, ln_rates = glomerulus.get_normalized_average_firing_rates(duration, bin_size)
+    print(f"{pn_rates}\n{ln_rates}")
     plt.show()
+
+    rate_bins = np.linspace(bin_size, duration, num=int(duration/bin_size))
+
+    # plt.figure(16 + i)
+    # plt.title(f"Glomerulus {i} PN Rates")
+    # plt.bar(rate_bins, pn_rates)
+    #
+    # plt.show()
+    #
+    #
+    # plt.figure(32 + i)
+    # plt.title(f"Glomerulus {i} Ln Rates")
+    # plt.bar(rate_bins, ln_rates)
+    # print("ok here")
+    # plt.show()
+    # print("yay!")
+
 
 
 
