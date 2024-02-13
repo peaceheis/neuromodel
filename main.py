@@ -4,12 +4,10 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-T_TOTAL = 1  # (sec)
-DELTA_T = .001  # (sec)
+T_TOTAL = 2  # (sec)
+DELTA_T = .005 * .001 # (sec)
 
-C_M = 1 * (10 ** -6)  # General Membrane Conductance (F/cm^2)
-
-TEMP = 18  # temperature for the psi expression?
+C_M = 1  # General Membrane Conductance (F/cm^2)
 
 # Equilibrium Potential Constants (mV)
 E_NA = 55  # Sodium Channel Equilibrium
@@ -20,71 +18,54 @@ V_REST = -70  # Rest Voltage
 # Voltage Independent Conductance Constants (Ohm^-1cm^-2)
 G_NA_MAX = 120  # Sodium
 G_K_MAX = 36  # Potassium
-G_L_MAX = .3  # Leak
+G_L_MAX = 0.3  # Leak
 
 # Initial Parameters (all placeholder for now)
-V_m = V_REST
 NUM_STEPS = int(T_TOTAL / DELTA_T)
 
 
 class Neuron:
-    def __init__(self, temp: float) -> None:
-        self.phi = 3 ** ((temp - 6.3) / 10)
-
+    def __init__(self) -> None:
         self.i_external: float = 0  # external current from dendrites
 
+        # membrane voltage
+        self.v_m: float = V_REST
+
         # sodium activation variable
-        self.m_prev: float = 0
-        self.m_current: float = 0.2
+        self.m: float = self.alpha_m() / (self.alpha_m() + self.beta_m())
 
         # sodium inactivation variable
-        self.h_prev: float = 0
-        self.h_current: float = 0.5
+        self.h: float = self.alpha_h() / (self.alpha_h() + self.beta_h())
 
         # k activation variable
-        self.n_prev: float = 0
-        self.n_current: float = 1
+        self.n: float = self.alpha_n() / (self.alpha_n() + self.beta_n())
 
-        # membrane voltage
-        self.v_prev: float = V_REST
-        self.v_current: float = V_REST
-        self.membrane_potential: float = self.v_current - V_REST
 
         self.is_spiking: bool = False
         self.spike_count: int = 0
 
         self.voltages: list = []
+        self.m_vals: list = []
+        self.h_vals: list = []
+        self.n_vals: list = []
 
     def update(self, delta_t: float):
-        self.voltages.append(self.v_current)
+        """updates neuronal model in the following order:
+            - caches invalidates the current m, h, and n values, putting them into the appropriate prev variable
+            - caches and invalidates the current V value, putting it into the v_prev variable
+            - updates current m, h, and n values
+            - updates current V value"""
+        self.m_vals.append(self.m)
+        self.h_vals.append(self.h)
+        self.n_vals.append(self.n)
 
-        alpha_m = self.alpha_m()
-        alpha_h = self.alpha_h()
-        alpha_n = self.alpha_n()
+        self.voltages.append(self.v_m)
 
-        beta_m = self.beta_m()
-        beta_h = self.beta_h()
-        beta_n = self.beta_n()
-        #dmdt = (alpha_m*(1-m)) - (beta_m*m)
-        #dndt = (alpha_n*(1-n)) - (beta_n*n)
-        #dhdt = (alpha_h*(1-h)) - (beta_h*h)
+        self.m += self.dm_dt(self.m) * delta_t
+        self.h += self.h + self.dh_dt(self.h) * delta_t
+        self.n += self.n + self.dn_dt(self.n) * delta_t
 
-        #alpha_m = (.02*(V_m-25)/(1-np.e**(-1*(V_m-25)/9)))
-        #alpha_n=.182*(V_m+35)/(1-np.e**(-1*(V_m-35)/9))
-        #alpha_h = .25*np.e**(-1*(V_m+90)/12)
-
-        #beta_m = (-.0002*(V_m-25)/(1-np.e**(-1*(V_m-25)/9)))
-        #beta_n = -.124*(V_m+35)/(1-np.e**(-1*(V_m-35)/9))
-        #beta_h = .25*np.e**((V_m+62)/6)/np.e**((V_m+90)/12)
-        self.v_prev = self.v_current
-        self.m_prev = self.m_current
-        self.h_prev = self.h_current
-        self.n_prev = self.n_current
-
-        self.v_current = self.v_prev + self.dv_dt()*delta_t
-        self.m_current = self.m_prev + self.dm_dt(self.m_prev)*delta_t
-        self.h_current = self.h_prev + self.dh_dt(self.h_prev)*delta_t
-        self.n_current = self.n_prev + self.dn_dt(self.n_prev)*delta_t
+        self.v_m = self.v_m + self.dv_dt() * delta_t
 
 
     def dv_dt(self) -> float:
@@ -95,106 +76,90 @@ class Neuron:
 
     def i_na(self) -> float:
         """sodium channel current"""
-        return self.g_na() * (self.v_current - E_NA)
+        return self.g_na() * (self.v_m - E_NA)
 
     def i_k(self) -> float:
         """potassium channel current"""
-        return self.g_k() * (self.v_current - E_K)
+        return self.g_k() * (self.v_m - E_K)
 
     def i_leak(self) -> float:
         """leak channel current"""
-        return G_L_MAX * (self.v_current - E_L)
+        return G_L_MAX * (self.v_m - E_L)
 
     # ion channel conductances
 
     def g_na(self) -> float:
         """sodium channel conductance"""
-        return G_NA_MAX * self.m_current ** 3 * self.h_current
+        return G_NA_MAX * (self.m ** 3) * self.h
 
     def g_k(self) -> float:
         """potassium channel conductance"""
-        return G_K_MAX * self.n_current ** 4
+        return G_K_MAX * (self.n ** 4)
 
     # gate variable rate functions
 
     def dm_dt(self, m: float) -> float:
         """sodium gate activation rate function"""
-        #return 1 / (self.tau_m() * (self.m_infinity() - m))
-        return alpha_m (1-self.m_prev) - beta_m * self.m_prev
+        return self.alpha_m() * self.v_m * (1 - m) - self.beta_m() * self.v_m * m
+
     def dh_dt(self, h: float) -> float:
         """sodium gate inactivation rate function"""
-        #return 1 / (self.tau_h() * (self.h_infinity() - h))
-        return alpha_n * (1-self.n_prev) - beta_n * self.n_prev
+        return self.alpha_h() * self.v_m * (1 - h) - self.beta_h() * self.v_m * h
+
     def dn_dt(self, n: float) -> float:
         """potassium gate activation rate function"""
-        #return 1 / (self.tau_n() * (self.n_infinity() - n))
-        return alpha_h * (1-self.h_prev) - beta_h * self.h_prev
-    # gate variable steady state functions
-'''
-    def m_infinity(self) -> float:
-        """sodium activation gate steady state function"""
-        return self.alpha_m() / (self.alpha_m() + self.beta_m())
+        return self.alpha_n() * self.v_m * (1 - n) - self.beta_h() * self.v_m * n
 
-    def h_infinity(self) -> float:
-        """sodium inactivation gate steady state function"""
-        return self.alpha_h() / (self.alpha_h() + self.beta_h())
 
-    def n_infinity(self) -> float:
-        """potassium activation gate steady state function"""
-        return self.alpha_n() / (self.alpha_n() + self.beta_n())
-
-    # time constant functions
-
-    def tau_m(self) -> float:
-        """sodium activation time constant function"""
-        return 1 / (self.alpha_m() + self.beta_m())
-
-    def tau_h(self) -> float:
-        """sodium inactivation time constant function"""
-        return 1 / (self.alpha_h() + self.beta_h())
-
-    def tau_n(self) -> float:
-        """potassium activation time constant function"""
-        return 1 / (self.alpha_n() + self.beta_n())
-'''
     # alpha (closed to open state) transition rate functions
 
     def alpha_m(self) -> float:
         """sodium activation gate opening transition rate function"""
-        #return self.phi * (2.5 - 0.1 * self.membrane_potential) / (math.exp(2.5 - 0.1 * self.membrane_potential) + 1)
-        return (.1*(25-V_m))/(np.e((25-V_m)/10)-1)  
+        return .1*((25-self.v_m) / (np.exp((25-self.v_m)/10)-1))
 
     def alpha_h(self) -> float:
         """sodium inactivation gate opening transition rate function"""
-        #return 0.07 * self.phi * math.exp(-self.membrane_potential / 20)
-        return .07*np.e(-V_m/20)
+        return .07*np.exp(-self.v_m/20)
+
     def alpha_n(self) -> float:
         """potassium activation gate opening transition rate function"""
-        #return self.phi * (0.1 - 0.01 * self.membrane_potential) / (math.exp(1 - 0.1 * self.membrane_potential) - 1)
-        return (.01*(10-V_m))/(np.e((10-V_m)/10)-1)
+        return 0.01 * ((10-self.v_m) / (np.exp((10-self.v_m)/10)-1))
+
     # beta (open to closed state) transition rate functions
 
     def beta_m(self) -> float:
         """sodium activation gate closing transition rate function"""
-        #return 4 * self.phi * math.exp(-self.membrane_potential / 20)
-        return 4*np.e(-V_m/18)
+        return 4*np.exp(-self.v_m/18)
+
     def beta_h(self) -> float:
         """sodium inactivation gate closing transition rate function"""
-        #return self.phi / (math.exp(3.0 - 0.1 * self.membrane_potential) + 1)
-        return 1/(np.e((30-V_m)/10)+1)
+        return 1/(np.exp((30-self.v_m)/10)+1)
+
     def beta_n(self) -> float:
         """potassium activation gate closing transition rate function"""
-        #return 0.125 * self.phi * math.exp(-self.membrane_potential / 80)
-        return .125*np.e(-V_m/80)
+        return .125*np.exp(-self.v_m/80)
 
-neuron = Neuron(9.0)
-x = np.linspace(0, 10, NUM_STEPS)
-Voltage = []
+
+neuron = Neuron()
+x = np.linspace(0, T_TOTAL, NUM_STEPS)
 
 for _ in range(NUM_STEPS):
     neuron.update(DELTA_T)
 
 plt.plot(x, neuron.voltages)
+plt.title("V_m")
+plt.show()
+
+plt.plot(x, neuron.m_vals)
+plt.title("m")
+plt.show()
+
+plt.plot(x, neuron.h_vals)
+plt.title("h")
+plt.show()
+
+plt.plot(x, neuron.n_vals)
+plt.title("n")
 plt.show()
 
 print(neuron.voltages)

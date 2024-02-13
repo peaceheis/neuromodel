@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 DELTA_T = .1  # ms
-NP_RANDOM_GENERATOR = np.random.default_rng(12384972)
+NP_RANDOM_GENERATOR = np.random.default_rng(985047891247389)
 
 
 def random_choice(given_prob: float):
@@ -20,7 +20,7 @@ class Neuron:
     V_L = 0.0
     V_EXC = 14 / 3
     V_STIM = 14 / 3
-    V_SK = - 2 / 3
+    V_SK = - 2/3
     V_INH = -2 / 3
     V_THRES = 1
     # tau values in milliseconds
@@ -40,7 +40,7 @@ class Neuron:
     LAMBDA_ODOR_MAX = 3.6  # spikes / ms
     LAMBDA_MECH_MAX = 1.8  # spikes / ms
 
-    STIM_DURATION = 1000  # ms
+    STIM_DURATION = 200  # ms
 
     SK_MU = 0.5
     SK_STDEV = 0.2
@@ -299,7 +299,6 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.LN_LN_PROBABILITY):
-                        print("connecting ln")
                         ln.connected_neurons.append(target)
 
     def synapse_onto_other_glomerulus(self, glomerulus: "Glomerulus"):
@@ -307,6 +306,11 @@ class Glomerulus:
             for pn in glomerulus.pns:
                 if random_choice(Glomerulus.LN_PN_PROBABILITY):
                     ln.connected_neurons.append(pn)
+
+    def get_neurons(self):
+        neurons = self.pns
+        neurons.extend(self.lns)
+        return neurons
 
     def update(self):
         for pn in self.pns:
@@ -353,11 +357,11 @@ class Network:
         for glomerulus in self.glomeruli:
             glomerulus.update()
 
-duration = 500
-stim_time = 250
+duration = 250
+stim_time = 50
 steps = int(duration / DELTA_T)
 
-network = Network(stim_time, "Odor", [0, 1, 2])
+network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
 vals = np.linspace(0, duration, steps) #linspace for iteration of the network
 
@@ -365,11 +369,20 @@ for val in vals:
     network.update()
     print(val)
 
-neurons = network.glomeruli[0].lns
-neurons.extend(network.glomeruli[0].pns)
+# for neuron in network.glomeruli[0].get_neurons():
+#     neuron.render(vals)
 
-for neuron in neurons:
-    neuron.render(vals)
+for i, glomerulus in enumerate(network.glomeruli):
+    data = []
+    for neuron in glomerulus.get_neurons():
+        data.append(neuron.spike_times)
+
+    plt.figure(figsize=(10, 7.5))
+    plt.title(f"Glomerulus {i} Eventplot")
+    plt.eventplot(data, colors="red")
+    plt.show()
+
+
 
 
 
