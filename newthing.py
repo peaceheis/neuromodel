@@ -39,7 +39,7 @@ class Neuron:
     LAMBDA_ODOR_MAX = 3.6  # spikes / ms
     LAMBDA_MECH_MAX = 1.8  # spikes / ms
 
-    STIM_DURATION = 200  # ms
+    STIM_DURATION = 1000  # ms
 
     SK_MU = 0.5
     SK_STDEV = 0.2
@@ -411,8 +411,8 @@ class Network:
             glomerulus.update()
 
 
-duration = 250
-stim_time = 50
+duration = 3000
+stim_time = 500
 bin_size = 50
 steps = int(duration / DELTA_T)
 
