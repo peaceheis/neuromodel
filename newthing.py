@@ -68,6 +68,8 @@ class Neuron:
         self.spike_counts = []
         self.voltages = []
         self.g_sk_vals = []
+        self.g_inh_vals = []
+        self.g_slow_vals = []
         self.refractory_counter = 0.0
         self.n_id = neuron_id
         self.total_inhibition: int = 0
@@ -247,6 +249,9 @@ class Neuron:
         plt.title(
             f"Voltage - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
+        plt.plot(vals, self.g_sk_vals, color = 'purple')
+        plt.plot(vals, self.g_slow_vals, color = 'orange')
+        plt.plot(self.g_inh_vals, color = 'green')
         plt.show()
         pass
 
@@ -296,6 +301,9 @@ class Neuron:
 
         self.t += DELTA_T
         self.voltages.append(self.v)
+        self.g_inh_vals.append(self.g_inh)
+        self.g_slow_vals.append(self.g_slow)
+        self.g_sk_vals.append(self.g_sk)
         self.spike_counts.append(len(self.spike_times))
 
 
@@ -426,7 +434,7 @@ class Network:
             glomerulus.update()
 
 
-duration = 250
+duration = 1000
 stim_time = 500
 bin_size = 50
 steps = int(duration / DELTA_T)
@@ -449,10 +457,12 @@ if should_serialize:
     prefix = f"/Users/scakolatse/coding-projects/neuromodel/output/{rn.year}{rn.month}{rn.day}-{rn.hour}.{rn.minute}.{rn.second}-{rn.microsecond}/"
     os.mkdir(prefix)
 
+totaldata= []
 for i, glomerulus in enumerate(network.glomeruli):
     data = []
     for neuron in glomerulus.get_neurons():
         data.append(neuron.spike_times)
+        totaldata.append(neuron.spike_times)
 
     fig, axs = plt.subplots(2, 2, figsize=(14, 5))
     fig.suptitle(f"Glomerulus {i}")
@@ -466,13 +476,15 @@ for i, glomerulus in enumerate(network.glomeruli):
     axs[0, 1].eventplot([[n.n_id for n in neuron.connected_neurons] for neuron in glomerulus.get_neurons()], colors=colors)
     axs[0, 1].set_title(f"Connectivity")
 
+    plt.figure()
+    plt.eventplot(totaldata, colors='blue')
+    plt.show()
+
     axs[1, 0].bar([f"{i}" in range (1, 17)], [neuron.total_excitation for neuron in glomerulus.get_neurons()], width = 0.25, color=colors)
     axs[1, 0].set_xlabel("Excitation Amounts")
 
     axs[1, 1].bar([f"{i}" in range(1, 17)], [neuron.total_inhibition for neuron in glomerulus.get_neurons()], width = 0.25, color=colors)
     axs[1, 0].set_xlabel("Inhibition Amounts")
-
-
 
     if should_serialize:
         plt.savefig(prefix + f"{i}.png")
