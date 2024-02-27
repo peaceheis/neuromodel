@@ -66,6 +66,8 @@ class Neuron:
         self.spike_counts = []
         self.voltages = []
         self.g_sk_vals = []
+        self.g_inh_vals = []
+        self.g_slow_vals = []
         self.refractory_counter = 0.0
         self.neuron_id = neuron_id
         # 4.2.1 The neuron model
@@ -241,6 +243,9 @@ class Neuron:
         plt.title(
             f"Voltage - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
+        plt.plot(vals, self.g_sk_vals, color = 'purple')
+        plt.plot(vals, self.g_slow_vals, color = 'orange')
+        plt.plot(self.g_inh_vals, color = 'green')
         plt.show()
         pass
 
@@ -290,6 +295,9 @@ class Neuron:
 
         self.t += DELTA_T
         self.voltages.append(self.v)
+        self.g_inh_vals.append(self.g_inh)
+        self.g_slow_vals.append(self.g_slow)
+        self.g_sk_vals.append(self.g_sk)
         self.spike_counts.append(len(self.spike_times))
 
 
@@ -411,7 +419,7 @@ class Network:
             glomerulus.update()
 
 
-duration = 3000
+duration = 1000
 stim_time = 500
 bin_size = 50
 steps = int(duration / DELTA_T)
@@ -428,11 +436,12 @@ for val in vals:
 #     neuron.render(vals)
 
 
-
+totaldata= []
 for i, glomerulus in enumerate(network.glomeruli):
     data = []
     for neuron in glomerulus.get_neurons():
         data.append(neuron.spike_times)
+        totaldata.append(neuron.spike_times)
 
     plt.figure(i, figsize=(10, 7.5))
     plt.title(f"Glomerulus {i} Eventplot")
@@ -440,6 +449,9 @@ for i, glomerulus in enumerate(network.glomeruli):
 
     pn_rates, ln_rates = glomerulus.get_normalized_average_firing_rates(duration, bin_size)
     print(f"{pn_rates}\n{ln_rates}")
+
+    plt.figure()
+    plt.eventplot(totaldata, colors='blue')
     plt.show()
 
     rate_bins = np.linspace(bin_size, duration, num=int(duration/bin_size))
