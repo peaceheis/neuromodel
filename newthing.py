@@ -15,6 +15,9 @@ def random_choice(given_prob: float):
         return False
 
 
+number_of_figures = 0
+
+
 class Neuron:
     V_L = 0.0
     V_EXC = 14 / 3
@@ -226,7 +229,6 @@ class Neuron:
 
             bins.append(bin_)
 
-
         rates = []
         for bin_ in bins:
             rates.append(len(bin_) / bin_size * (1 / 1000))  # (adjusted for fires / sec)
@@ -235,18 +237,21 @@ class Neuron:
 
     def render(self, vals: np.linspace):
         """creates a pyplot visualization of the voltage values"""
-        plt.figure(figsize=(6.4, 4.8))
+        global number_of_figures
+        number_of_figures += 1
+        plt.figure(number_of_figures, figsize=(6.4, 4.8))
         plt.title(
             f"Spike Count - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.spike_counts, color="red" if self.neuron_type == "LN" else "blue")
+        number_of_figures += 1
         plt.figure()
         plt.title(
             f"Voltage - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
-        plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
-        plt.plot(vals, self.g_sk_vals, color = 'purple')
-        plt.plot(vals, self.g_slow_vals, color = 'orange')
-        plt.plot(self.g_inh_vals, color = 'green')
-        plt.show()
+        plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue", label='voltages')
+        plt.plot(vals, np.multiply(20000, self.g_sk_vals), color='purple', label='g_sk')
+        plt.plot(vals, np.multiply(20, self.g_slow_vals), color='orange', label='g_slow')
+        plt.plot(vals, np.multiply(.11, self.g_inh_vals), color='green', label='g_inh')
+        plt.legend()
         pass
 
     def update(self):
@@ -299,6 +304,7 @@ class Neuron:
         self.g_slow_vals.append(self.g_slow)
         self.g_sk_vals.append(self.g_sk)
         self.spike_counts.append(len(self.spike_times))
+        print(self.g_sk)
 
 
 class Glomerulus:
@@ -369,15 +375,12 @@ class Glomerulus:
             avg_ln_firing_rates.append(np.average([rates[i] for rates in ln_firing_rates]))
 
         pn_bg = avg_pn_firing_rates[0]
-        normalized_avg_pn_firing_rates = [rate/pn_bg for rate in avg_pn_firing_rates ]
+        normalized_avg_pn_firing_rates = [rate / pn_bg for rate in avg_pn_firing_rates]
 
         ln_bg = avg_pn_firing_rates[0]
         normalized_avg_ln_firing_rates = [rate / ln_bg for rate in avg_ln_firing_rates]
 
         return normalized_avg_pn_firing_rates, normalized_avg_ln_firing_rates
-
-
-
 
 
 class Network:
@@ -420,7 +423,7 @@ class Network:
 
 
 duration = 1000
-stim_time = 500
+stim_time = 350
 bin_size = 50
 steps = int(duration / DELTA_T)
 
@@ -432,48 +435,41 @@ for val in vals:
     network.update()
     print(val)
 
-# for neuron in network.glomeruli[0].get_neurons():
-#     neuron.render(vals)
+for neuron in network.glomeruli[0].get_neurons():
+    neuron.render(vals)
 
-
-totaldata= []
+totaldata = []
 for i, glomerulus in enumerate(network.glomeruli):
     data = []
     for neuron in glomerulus.get_neurons():
         data.append(neuron.spike_times)
         totaldata.append(neuron.spike_times)
-
-    plt.figure(i, figsize=(10, 7.5))
+    number_of_figures += 1
+    plt.figure(number_of_figures, figsize=(10, 7.5))
     plt.title(f"Glomerulus {i} Eventplot")
     plt.eventplot(data, colors="red")
 
     pn_rates, ln_rates = glomerulus.get_normalized_average_firing_rates(duration, bin_size)
     print(f"{pn_rates}\n{ln_rates}")
+number_of_figures += 1
+plt.figure(number_of_figures)
+plt.eventplot(totaldata, colors='blue')
+plt.show()
+# rate_bins = np.linspace(bin_size, duration, num=int(duration / bin_size))
 
-    plt.figure()
-    plt.eventplot(totaldata, colors='blue')
-    plt.show()
-
-    rate_bins = np.linspace(bin_size, duration, num=int(duration/bin_size))
-
-    # plt.figure(16 + i)
-    # plt.title(f"Glomerulus {i} PN Rates")
-    # plt.bar(rate_bins, pn_rates)
-    #
-    # plt.show()
-    #
-    #
-    # plt.figure(32 + i)
-    # plt.title(f"Glomerulus {i} Ln Rates")
-    # plt.bar(rate_bins, ln_rates)
-    # print("ok here")
-    # plt.show()
-    # print("yay!")
-
-
-
-
-
+# plt.figure(16 + i)
+# plt.title(f"Glomerulus {i} PN Rates")
+# plt.bar(rate_bins, pn_rates)
+#
+# plt.show()
+#
+#
+# plt.figure(32 + i)
+# plt.title(f"Glomerulus {i} Ln Rates")
+# plt.bar(rate_bins, ln_rates)
+# print("ok here")
+# plt.show()
+# print("yay!")
 
 # for i in range(6):
 # glomerulus = Glomerulus(1000, Neuron.LAMBDA_ODOR_MAX, Neuron.LAMBDA_MECH_MAX)
