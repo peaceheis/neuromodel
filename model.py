@@ -1,11 +1,12 @@
-import math
+from copy import copy
+import json
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 
-DELTA_T = .1  # ms
-NP_RANDOM_GENERATOR = np.random.default_rng(985047891247389)
-
+SEED = 4563465435645
+NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
+DELTA_T = 0.1
 
 def random_choice(given_prob: float):
     rand_val = NP_RANDOM_GENERATOR.uniform(0, 1)
@@ -15,15 +16,10 @@ def random_choice(given_prob: float):
         return False
 
 
-number_of_figures = 0
-
-
 class Neuron:
     V_L = 0.0
-    V_EXC = 14 / 3
-    V_STIM = 14 / 3
-    V_SK = - 2 / 3
-    V_INH = -2 / 3
+    V_EXC = V_STIM = 14 / 3
+    V_INH = V_SK = -2 / 3
     V_THRES = 1
     # tau values in milliseconds
     TAU_V = 20  # leakage timecsale
@@ -72,7 +68,9 @@ class Neuron:
         self.g_inh_vals = []
         self.g_slow_vals = []
         self.refractory_counter = 0.0
-        self.neuron_id = neuron_id
+        self.n_id = neuron_id
+        self.total_inhibition: int = 0
+        self.total_excitation: int = 0
         # 4.2.1 The neuron model
         # reversal potentials (nondimensional)
 
@@ -83,7 +81,6 @@ class Neuron:
             self.s_inh = 0.015
             self.s_slow = 0.04
             self.s_stim = 0.0031
-            self.g_stim = 0.0031
 
         else:  # self.type == "PN"
             self.odor_tau_rise = 35
@@ -92,7 +89,6 @@ class Neuron:
             self.s_inh = 0.0169
             self.s_slow = 0.0338
             self.s_stim = 0.004
-            self.g_stim = 0.004
             self.s_sk = NP_RANDOM_GENERATOR.normal(Neuron.SK_MU, Neuron.SK_STDEV)
             if self.s_sk < 0:
                 self.s_sk = 0
@@ -103,6 +99,9 @@ class Neuron:
         self.g_slow = 0.0
         self.g_inh = 0.0
         self.g_exc = 0.0
+
+    def __repr__(self):
+        return f"Neuron {self.n_id}"
 
     @staticmethod
     def Heaviside(num: float | int) -> int:  # gives the h value for alpha_exc function
@@ -237,21 +236,18 @@ class Neuron:
 
     def render(self, vals: np.linspace):
         """creates a pyplot visualization of the voltage values"""
-        global number_of_figures
-        number_of_figures += 1
-        plt.figure(number_of_figures, figsize=(6.4, 4.8))
+        plt.figure(figsize=(6.4, 4.8))
         plt.title(
-            f"Spike Count - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
+            f"Spike Count - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.spike_counts, color="red" if self.neuron_type == "LN" else "blue")
-        number_of_figures += 1
         plt.figure()
         plt.title(
-            f"Voltage - {self.neuron_type} {self.neuron_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
-        plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue", label='voltages')
-        plt.plot(vals, np.multiply(20000, self.g_sk_vals), color='purple', label='g_sk')
-        plt.plot(vals, np.multiply(20, self.g_slow_vals), color='orange', label='g_slow')
-        plt.plot(vals, np.multiply(.11, self.g_inh_vals), color='green', label='g_inh')
-        plt.legend()
+            f"Voltage - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
+        plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
+        plt.plot(vals, self.g_sk_vals, color='purple')
+        plt.plot(vals, self.g_slow_vals, color='orange')
+        plt.plot(self.g_inh_vals, color='green')
+        plt.show()
         pass
 
     def update(self):
@@ -304,26 +300,27 @@ class Neuron:
         self.g_slow_vals.append(self.g_slow)
         self.g_sk_vals.append(self.g_sk)
         self.spike_counts.append(len(self.spike_times))
-        print(self.g_sk)
 
 
 class Glomerulus:
     PN_PN_PROBABILITY = 0.75
     PN_LN_PROBABILITY = 0.75
     LN_PN_PROBABILITY = 0.38
-    LN_LN_PROBABILITY = 0.28
+    LN_LN_PROBABILITY = 0.25
     count = 0
 
-    def __init__(self, stim_time: float, lambda_odor: float, lambda_mech: float):
+    def __init__(self, stim_time: float, lambda_odor: float, lambda_mech: float, g_id: int):
         self.stim_times = stim_time
         self.lambda_odor_factor = lambda_odor
         self.lambda_mech_factor = lambda_mech
         self.pns: list[Neuron] = [Neuron(stim_time, lambda_odor, lambda_mech, "PN", neuron_id=i) for i in range(1, 11)]
         self.lns: list[Neuron] = [Neuron(stim_time, lambda_odor, lambda_mech, "LN", neuron_id=j) for j in range(11, 17)]
-        self.neurons = self.pns
+        self.neurons = copy(self.pns)
         self.neurons.extend(self.lns)
+        self.g_id = g_id
 
-        print(f"{len(self.pns)}, {len(self.lns)}")
+        print(f"{self.pns}")
+        print(f"NEURON COUNTS: {len(self.pns)}, {len(self.lns)}")
 
         # build synapse network
         for pn in self.pns:
@@ -332,28 +329,38 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.PN_PN_PROBABILITY):
+                        print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto PN {target.n_id}")
                         pn.connected_neurons.append(target)
+                        target.total_excitation += 1
 
             for target in self.lns:
                 if random_choice(Glomerulus.PN_LN_PROBABILITY):
+                    print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto LN {target.n_id}")
                     pn.connected_neurons.append(target)
+                    target.total_excitation += 1
 
         for ln in self.lns:
             for target in self.pns:
                 if random_choice(Glomerulus.LN_PN_PROBABILITY):
+                    print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto PN {target.n_id}")
                     ln.connected_neurons.append(target)
+                    target.total_inhibition += 1
+
             for target in self.lns:
                 if ln is target:
                     continue
                 else:
                     if random_choice(Glomerulus.LN_LN_PROBABILITY):
+                        print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto LN {target.n_id}")
                         ln.connected_neurons.append(target)
+                        target.total_inhibition += 1
 
     def synapse_onto_other_glomerulus(self, glomerulus: "Glomerulus"):
         for ln in self.lns:
             for pn in glomerulus.pns:
                 if random_choice(Glomerulus.LN_PN_PROBABILITY):
                     ln.connected_neurons.append(pn)
+                    pn.total_inhibition += 1
 
     def get_neurons(self):
         return self.neurons
@@ -395,20 +402,20 @@ class Network:
                 for i in range(6):
                     self.glomeruli.append(Glomerulus(self.stim_time,
                                                      Neuron.LAMBDA_ODOR_MAX * affected_glomeruli.count(i),
-                                                     0))
+                                                     0, i))
             case "Mechanosensory":
-                for _ in range(6):
-                    self.glomeruli.append(Glomerulus(self.stim_time, 0, Neuron.LAMBDA_MECH_MAX))
+                for i in range(6):
+                    self.glomeruli.append(Glomerulus(self.stim_time, 0, Neuron.LAMBDA_MECH_MAX, i))
             case "Normalized":
                 for i in range(6):
                     self.glomeruli.append(Glomerulus(self.stim_time,
                                                      0.5 * Neuron.LAMBDA_ODOR_MAX * affected_glomeruli.count(i),
-                                                     0.5 * Neuron.LAMBDA_MECH_MAX))
+                                                     0.5 * Neuron.LAMBDA_MECH_MAX, i))
             case "Additive":
                 for i in range(6):
                     self.glomeruli.append(Glomerulus(self.stim_time,
                                                      Neuron.LAMBDA_ODOR_MAX * affected_glomeruli.count(i),
-                                                     Neuron.LAMBDA_MECH_MAX))
+                                                     Neuron.LAMBDA_MECH_MAX, i))
 
         for glomerulus in self.glomeruli:
             for target in self.glomeruli:
@@ -420,112 +427,3 @@ class Network:
     def update(self):
         for glomerulus in self.glomeruli:
             glomerulus.update()
-
-
-duration = 1000
-stim_time = 350
-bin_size = 50
-steps = int(duration / DELTA_T)
-
-network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
-
-vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
-
-for val in vals:
-    network.update()
-    print(val)
-
-for neuron in network.glomeruli[0].get_neurons():
-    neuron.render(vals)
-
-totaldata = []
-for i, glomerulus in enumerate(network.glomeruli):
-    data = []
-    for neuron in glomerulus.get_neurons():
-        data.append(neuron.spike_times)
-        totaldata.append(neuron.spike_times)
-    number_of_figures += 1
-    plt.figure(number_of_figures, figsize=(10, 7.5))
-    plt.title(f"Glomerulus {i} Eventplot")
-    plt.eventplot(data, colors="red")
-
-    pn_rates, ln_rates = glomerulus.get_normalized_average_firing_rates(duration, bin_size)
-    print(f"{pn_rates}\n{ln_rates}")
-number_of_figures += 1
-plt.figure(number_of_figures)
-plt.eventplot(totaldata, colors='blue')
-plt.show()
-# rate_bins = np.linspace(bin_size, duration, num=int(duration / bin_size))
-
-# plt.figure(16 + i)
-# plt.title(f"Glomerulus {i} PN Rates")
-# plt.bar(rate_bins, pn_rates)
-#
-# plt.show()
-#
-#
-# plt.figure(32 + i)
-# plt.title(f"Glomerulus {i} Ln Rates")
-# plt.bar(rate_bins, ln_rates)
-# print("ok here")
-# plt.show()
-# print("yay!")
-
-# for i in range(6):
-# glomerulus = Glomerulus(1000, Neuron.LAMBDA_ODOR_MAX, Neuron.LAMBDA_MECH_MAX)
-# neuron = Neuron(250, 0, Neuron.LAMBDA_MECH_MAX, "PN")
-#
-# steps = np.linspace(0, duration, num=int(duration / DELTA_T))
-#
-# for step in steps:
-#     print(step)
-#     glomerulus.update()
-#
-# neurons = glomerulus.pns
-# neurons.extend(glomerulus.lns)
-# plt.figure(figsize=(6.4, 4.8))
-# plt.title(f"Spike Count - {neuron.neuron_type} - Lambda Odor: {neuron.lambda_odor}, Lambda Mech: {neuron.lambda_mech}")
-# plt.plot(steps, neuron.spike_counts, color="red" if neuron.neuron_type == "LN" else "blue")
-# plt.show()
-# plt.figure()
-# plt.title(f"Voltage - {neuron.neuron_type} - Lambda Odor: {neuron.lambda_odor}, Lambda Mech: {neuron.lambda_mech}")
-# plt.plot(steps, neuron.voltages, color="red" if neuron.neuron_type == "LN" else "blue")
-# plt.show()
-
-'''
-neuron2.connected_neurons.append(neuron)
-neuron.connected_neurons.append(neuron2)
-
-for i, neuron in enumerate(neurons):
-    plt.figure(figsize=(8, 6))
-    plt.plot(steps, neuron.spike_counts, color=([f'C{i}' for i in range(10)] + [f'C{i}' for i in range(6)])[i], linewidth=1)
-    plt.show()
-    data.append(neuron.spike_times)
-plt.eventplot(data, colors=[f'C{i}' for i in range(10)] + [f'C{i}' for i in range(6)], lineoffsets=2, linewidths=1)
-print(data)
-plt.show()
-
-for step in steps:
-    neuron.update()
-    neuron2.update()
-    if int(neuron.t) == 1000:
-        bg_count = len(neuron.spike_times)
-        bg_count_2 = len(neuron2.spike_times)
-    if int(neuron.t) == 1500:
-        last_500 = len(neuron.spike_times)
-        last_500_2 = len(neuron2.spike_times)
-
-bg_rate = bg_count / 1000
-bg_rate_2 = bg_count_2 / 1000
-end_count = len(neuron.spike_times) - last_500
-end_count_2 = len(neuron2.spike_times) - last_500_2
-end_rate = end_count / 500
-end_rate_2 = end_count_2 / 500
-
-print(f"FIRING COUNTS - NEURON 1 - 1s bg {bg_count}, last 500ms {end_count}")
-print(f"FIRING COUNTS - NEURON 2 - 1s bg {bg_count_2}, last 500ms {end_count_2}")
-print(f"FIRING RATES - NEURON 1 - 1s bg {bg_rate}, last 500ms {end_rate}")
-print(f"FIRING RATES - NEURON 2 - 1s bg {bg_rate_2}, last 500ms {end_rate_2}")
-print(f"NORMALIZED RATE - NEURON 1 - {end_rate / bg_rate}")
-print(f"NORMALIZED RATE - NEURON 2 - {end_rate_2 / bg_rate_2}")
-'''
