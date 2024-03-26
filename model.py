@@ -4,7 +4,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 4563465435645
+SEED = 2345874839572
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
 
@@ -80,7 +80,7 @@ class Neuron:
             self.s_pn = 0.006
             self.s_inh = 0.015
             self.s_slow = 0.04
-            self.s_stim = 0.0031
+            self.s_stim = 0.0026
 
         else:  # self.type == "PN"
             self.odor_tau_rise = 35
@@ -122,7 +122,7 @@ class Neuron:
             sigmoid_term_den = 1 + sigmoid_term_num
             return heaviside_term * sigmoid_term_num / sigmoid_term_den
         else:
-            exp_decay = -(self.t - (stim_time + 2 * Neuron.TAU_HALF_RISE_SK)) / self.TAU_SK
+            exp_decay = -(self.t - (stim_time + (2 * Neuron.TAU_HALF_RISE_SK))) / self.TAU_SK
             return (1 / self.TAU_SK) * np.exp(exp_decay)
 
     def g_gen(self, s_val, tau_val: float, s_set: list) -> float:
@@ -303,8 +303,8 @@ class Neuron:
 
 
 class Glomerulus:
-    PN_PN_PROBABILITY = 0.75
-    PN_LN_PROBABILITY = 0.75
+    PN_PN_PROBABILITY = 0.50
+    PN_LN_PROBABILITY = 0.50
     LN_PN_PROBABILITY = 0.38
     LN_LN_PROBABILITY = 0.25
     count = 0
