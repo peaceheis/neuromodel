@@ -7,11 +7,11 @@ from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T
 
-duration = 500
-stim_time = 1500
+duration = 2000
+stim_time = 50
 bin_size = 50
 steps = int(duration / DELTA_T)
-prefix = json.load(open("run_config.json"))["prefix"]
+prefix = ""
 
 network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
@@ -65,8 +65,9 @@ for i, glomerulus in enumerate(network.glomeruli):
         plt.show()
 
     for neuron in glomerulus.get_neurons():
-        print(f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}")
-        print(f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}")
+        print(f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+        print(f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+
 
 plt.figure()
 plt.title("Total Glomerular Activity")
@@ -76,7 +77,7 @@ if should_serialize:
 else:
     plt.show()
 
-for neuron in network.glomeruli[5].get_neurons():
+for neuron in network.glomeruli[3].get_neurons():
     plt.figure()
     plt.title(f"Neuron {neuron.n_id} G Sk")
     plt.plot(np.multiply(10, neuron.g_sk_vals))
