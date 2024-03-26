@@ -4,9 +4,10 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 2345874839572
+SEED = 1432847328947938279
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
+
 
 def random_choice(given_prob: float):
     rand_val = NP_RANDOM_GENERATOR.uniform(0, 1)
@@ -26,6 +27,7 @@ class Neuron:
     TAU_EXC = 2
     TAU_INH = 2
     TAU_SLOW = 750
+    TAU_EXC_SLOW = 780
     TAU_STIM = 2
     TAU_DECAY = 384
     TAU_SK = 250
@@ -38,7 +40,7 @@ class Neuron:
     LAMBDA_ODOR_MAX = 3.6  # spikes / ms
     LAMBDA_MECH_MAX = 1.8  # spikes / ms
 
-    STIM_DURATION = 1000  # ms
+    STIM_DURATION = 500  # ms
 
     SK_MU = 0.5
     SK_STDEV = 0.2
@@ -77,7 +79,8 @@ class Neuron:
         if self.neuron_type == "LN":
             self.odor_tau_rise = 0
             self.mech_tau_rise = 300
-            self.s_pn = 0.006
+            self.s_pn = 0.006 * .60
+            self.s_pn_slow = self.s_pn * 0
             self.s_inh = 0.015
             self.s_slow = 0.04
             self.s_stim = 0.0026
@@ -86,7 +89,8 @@ class Neuron:
             self.odor_tau_rise = 35
             self.mech_tau_rise = 0
             self.s_pn = 0.01
-            self.s_inh = 0.0169
+            self.s_pn_slow = 0.01
+            self.s_inh = 0.0169 * .85
             self.s_slow = 0.0338
             self.s_stim = 0.004
             self.s_sk = NP_RANDOM_GENERATOR.normal(Neuron.SK_MU, Neuron.SK_STDEV)
@@ -99,6 +103,7 @@ class Neuron:
         self.g_slow = 0.0
         self.g_inh = 0.0
         self.g_exc = 0.0
+        self.g_exc_slow = 0.0
 
     def __repr__(self):
         return f"Neuron {self.n_id}"
@@ -285,14 +290,16 @@ class Neuron:
                              (self.g_stim * (self.v - self.V_STIM)) - \
                              (self.g_exc * (self.v - self.V_EXC)) - \
                              (self.g_inh * (self.v - self.V_INH)) - \
-                             (self.g_slow * (self.v - self.V_INH))
+                             (self.g_slow * (self.v - self.V_INH)) - \
+                             (self.g_exc * (self.v - self.V_EXC))
 
             else:  # self.type == "LN"
                 self.dv_dt = (-1 * (self.v - self.V_L) / self.TAU_V) - \
                              (self.g_stim * (self.v - self.V_STIM)) - \
                              (self.g_exc * (self.v - self.V_EXC)) - \
                              (self.g_inh * (self.v - self.V_INH)) - \
-                             (self.g_slow * (self.v - self.V_INH))
+                             (self.g_slow * (self.v - self.V_INH)) - \
+                             (self.g_exc * (self.v - self.V_EXC))
 
         self.t += DELTA_T
         self.voltages.append(self.v)
@@ -305,7 +312,7 @@ class Neuron:
 class Glomerulus:
     PN_PN_PROBABILITY = 0.50
     PN_LN_PROBABILITY = 0.50
-    LN_PN_PROBABILITY = 0.38
+    LN_PN_PROBABILITY = 0.40
     LN_LN_PROBABILITY = 0.25
     count = 0
 

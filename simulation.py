@@ -1,6 +1,5 @@
 import os
 from datetime import datetime
-import json
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -8,10 +7,10 @@ from matplotlib import pyplot as plt
 from model import Network, DELTA_T
 
 duration = 2000
-stim_time = 50
+stim_time = 200
 bin_size = 50
 steps = int(duration / DELTA_T)
-prefix = ""
+prefix = "output/"
 
 network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
