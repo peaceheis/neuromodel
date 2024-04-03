@@ -2,16 +2,17 @@ import os
 from datetime import datetime
 
 import numpy as np
+import json
 from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T
 
-duration = 2000
+duration = 1000
 stim_time = 200
 bin_size = 50
 steps = int(duration / DELTA_T)
-prefix = "output/"
-
+#prefix = json.load("config.json")["prefix"]
+prefix = r"C:\Users\wjtor\Patel Research\output"
 network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
 vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
@@ -19,7 +20,6 @@ vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
 for val in vals:
     network.update()
     print(val)
-
 # for neuron in network.glomeruli[0].get_neurons():
 #     neuron.render(vals)
 
@@ -63,10 +63,11 @@ for i, glomerulus in enumerate(network.glomeruli):
     else:
         plt.show()
 
-    for neuron in glomerulus.get_neurons():
-        print(f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
-        print(f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
-
+for neuron in glomerulus.get_neurons():
+    print(
+        f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+    print(
+        f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
 
 plt.figure()
 plt.title("Total Glomerular Activity")
@@ -77,11 +78,13 @@ else:
     plt.show()
 
 for neuron in network.glomeruli[3].get_neurons():
-    plt.figure()
+    neuron.render(vals)
+    '''plt.figure()
     plt.title(f"Neuron {neuron.n_id} G Sk")
     plt.plot(np.multiply(10, neuron.g_sk_vals))
     plt.plot(neuron.voltages)
-    plt.show()
+    '''
+plt.show()
 
     # plt.figure(16 + i)
     # plt.title(f"Glomerulus {i} PN Rates")
