@@ -4,10 +4,12 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 1432847328947938279
+SEED = 1435722988947938279
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
 
+
+# FIXME: LNs accidentally exciting each other?
 
 def random_choice(given_prob: float):
     rand_val = NP_RANDOM_GENERATOR.uniform(0, 1)
@@ -27,7 +29,7 @@ class Neuron:
     TAU_EXC = 2
     TAU_INH = 2
     TAU_SLOW = 750
-    TAU_EXC_SLOW = 850
+    TAU_EXC_SLOW = 300 # 780
     TAU_STIM = 2
     TAU_DECAY = 384
     TAU_SK = 250
@@ -84,9 +86,11 @@ class Neuron:
         self.spike_times = []
         self.spike_counts = []
         self.voltages = []
+        self.g_exc_vals = []
         self.g_sk_vals = []
         self.g_inh_vals = []
         self.g_slow_vals = []
+        self.slow_exc_vals = []
         self.refractory_counter = 0.0
         self.n_id = neuron_id
         self.total_inhibition: int = 0
@@ -153,6 +157,9 @@ class Neuron:
 
     def g_sk_func(self):
         return np.sum([self.s_sk * self.beta(s) for s in self.spike_times])
+
+    def slow_exc_func(self):
+        return np.sum([20 * self.s_pn_slow * self.beta(s) for s in self.spike_times])
 
     def odor_dyn(self) -> float:
         if self.neuron_type == "PN":
@@ -245,18 +252,24 @@ class Neuron:
 
     def render(self, vals: np.linspace):
         """creates a pyplot visualization of the voltage values"""
+        '''
         plt.figure(figsize=(6.4, 4.8))
         plt.title(
             f"Spike Count - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
         plt.plot(vals, self.spike_counts, color="red" if self.neuron_type == "LN" else "blue")
+        '''
         plt.figure()
         plt.title(
             f"Voltage - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
-        plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue")
-        plt.plot(vals, self.g_sk_vals, color='purple')
-        plt.plot(vals, self.g_slow_vals, color='orange')
-        plt.plot(self.g_inh_vals, color='green')
-        plt.show()
+        # plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue", label = 'voltage')
+        if self.neuron_type == "PN":
+            plt.plot(vals, self.g_sk_vals, color='purple', label='g_sk')
+            plt.plot(vals, self.g_slow_vals, color='orange', label='g_slow')
+            # plt.plot(vals, self.g_inh_vals, color='green', label='g_inh')
+            plt.plot(vals, self.slow_exc_vals, color='pink', label='slow excitation')
+            plt.plot(vals, self.g_exc_vals, color='grey', label='excitation')
+            plt.legend()
+            # plt.show()
         pass
 
     def update(self):
@@ -282,20 +295,21 @@ class Neuron:
             self.g_inh = self.g_gen(self.s_inh, Neuron.TAU_INH, self.inh_times)
             self.g_slow = self.g_gen(self.s_slow, Neuron.TAU_SLOW, self.inh_times)
             self.g_stim = self.g_gen(self.s_stim, Neuron.TAU_STIM, self.stim_times)
-
+            #self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
             self.filter_exc_times()
             self.filter_inh_times()
             self.filter_stim_times()
 
             if self.neuron_type == "PN":
                 self.g_sk = self.g_sk_func()
+                self.g_exc_slow = self.slow_exc_func()
                 self.dv_dt = (-1 * (self.v - self.V_L) / self.TAU_V) - \
                              (self.g_sk * (self.v - self.V_SK)) - \
                              (self.g_stim * (self.v - self.V_STIM)) - \
                              (self.g_exc * (self.v - self.V_EXC)) - \
                              (self.g_inh * (self.v - self.V_INH)) - \
                              (self.g_slow * (self.v - self.V_INH)) - \
-                             (self.g_exc * (self.v - self.V_EXC))
+                             (self.g_exc_slow * (self.v - self.V_EXC))
 
             else:  # self.type == "LN"
                 self.dv_dt = (-1 * (self.v - self.V_L) / self.TAU_V) - \
@@ -303,14 +317,16 @@ class Neuron:
                              (self.g_exc * (self.v - self.V_EXC)) - \
                              (self.g_inh * (self.v - self.V_INH)) - \
                              (self.g_slow * (self.v - self.V_INH)) - \
-                             (self.g_exc * (self.v - self.V_EXC))
+                             (self.g_exc_slow * (self.v - self.V_EXC))
 
         self.t += DELTA_T
         self.voltages.append(self.v)
-        self.g_inh_vals.append(self.g_inh)
-        self.g_slow_vals.append(self.g_slow)
-        self.g_sk_vals.append(self.g_sk)
+        self.g_inh_vals.append(self.g_inh * 0.4)
+        self.g_slow_vals.append(self.g_slow * 5)
+        self.g_sk_vals.append(self.g_sk * 5)
         self.spike_counts.append(len(self.spike_times))
+        self.slow_exc_vals.append(self.g_exc_slow)
+        self.g_exc_vals.append(self.g_exc)
 
     def generate_firing_rates(self, duration, bin_size):
         rates = []
@@ -325,7 +341,7 @@ class Glomerulus:
     PN_PN_PROBABILITY = 0.50
     PN_LN_PROBABILITY = 0.50
     LN_PN_PROBABILITY = 0.40
-    LN_LN_PROBABILITY = 0.25
+    LN_LN_PROBABILITY = 0.25  # .25
     count = 0
 
     def __init__(self, stim_time: float, lambda_odor: float, lambda_mech: float, g_id: int):
