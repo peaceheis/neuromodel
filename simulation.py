@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from model import Network, DELTA_T, Neuron
 
 duration = 2000
-stim_time = 500
+stim_time = 100
 BIN_SIZE = 50
 assert(stim_time % BIN_SIZE == 0)
 steps = int(duration / DELTA_T)
@@ -23,8 +23,8 @@ for val in vals:
     print(val)
 
 
-# for neuron in network.glomeruli[0].get_neurons():
-#     neuron.render(vals)
+for neuron in network.glomeruli[0].get_neurons():
+     neuron.render(vals)
 
 def save_constants(prefix_):
     constants = {
@@ -97,11 +97,12 @@ for i, glomerulus in enumerate(network.glomeruli):
     axs[1, 1].bar([i for i in range(1, 17)], [neuron.total_inhibition for neuron in glomerulus.get_neurons()],
                   width=0.25, color=colors)
     axs[1, 1].set_xlabel("Inhibition Amounts")
-
-    if should_serialize:
-        plt.savefig(prefix + f"{i}.png")
-    else:
-        plt.show()
+''''''
+if should_serialize:
+    plt.savefig(prefix + f"{i}.png")
+else:
+    pass
+#plt.show()
 
     for neuron in glomerulus.get_neurons():
         print(
@@ -115,7 +116,8 @@ plt.eventplot(totaldata, colors='blue')
 if should_serialize:
     plt.savefig(prefix + f"total")
 else:
-    plt.show()
+    pass
+    #plt.show()
 
 # for neuron in network.glomeruli[3].get_neurons():
 #     plt.figure()
@@ -123,7 +125,6 @@ else:
 #     plt.plot(np.multiply(10, neuron.g_sk_vals))
 #     plt.plot(neuron.voltages)
 #     plt.show()
-
 for glomerulus in network.glomeruli:
     plt.figure()
     plt.title(f"Glomerulus {glomerulus.g_id} PN Firing Rates")
@@ -132,7 +133,8 @@ for glomerulus in network.glomeruli:
     if should_serialize:
         plt.savefig(prefix + f"{glomerulus.g_id}_rates_pn")
     else:
-        plt.show()
+        pass
+        #plt.show()
 
     plt.figure()
     plt.title(f"Glomerulus {glomerulus.g_id} LN Firing Rates")
@@ -141,7 +143,8 @@ for glomerulus in network.glomeruli:
     if should_serialize:
         plt.savefig(prefix + f"{glomerulus.g_id}_rates_ln")
     else:
-        plt.show()
+        pass
+#plt.show()
 
 # plt.figure(16 + i)
 # plt.title(f"Glomerulus {i} PN Rates")
@@ -215,3 +218,4 @@ print(f"FIRING RATES - NEURON 2 - 1s bg {bg_rate_2}, last 500ms {end_rate_2}")
 print(f"NORMALIZED RATE - NEURON 1 - {end_rate / bg_rate}")
 print(f"NORMALIZED RATE - NEURON 2 - {end_rate_2 / bg_rate_2}")
 '''
+plt.show()

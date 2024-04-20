@@ -29,12 +29,12 @@ class Neuron:
     TAU_EXC = 2
     TAU_INH = 2
     TAU_SLOW = 750
-    TAU_EXC_SLOW = 400 # 780
+    TAU_EXC_SLOW = 300  # 780
     TAU_STIM = 2
     TAU_DECAY = 384
     TAU_SK = 250
     TAU_HALF_RISE_SK = 25
-    TAU_HALF_RISE_EXC = 200
+    TAU_HALF_RISE_EXC = 800
     STIMULUS_TAU_DECAY = 2
     TAU_REFRACTORY = 2
 
@@ -171,7 +171,7 @@ class Neuron:
         return np.sum([self.s_sk * self.beta(s) for s in self.spike_times])
 
     def slow_exc_func(self):
-        return np.sum([20 * self.s_pn_slow * self.beta_slow_exc(s) for s in self.spike_times])
+        return np.sum([50 * self.s_pn_slow * self.beta_slow_exc(s) for s in self.spike_times])
 
     def odor_dyn(self) -> float:
         if self.neuron_type == "PN":
