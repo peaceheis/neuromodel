@@ -7,8 +7,8 @@ from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T
 
-duration = 1000
-stim_time = 100
+duration = 2000
+stim_time = 500
 bin_size = 50
 steps = int(duration / DELTA_T)
 #prefix = json.load("config.json")["prefix"]

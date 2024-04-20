@@ -29,11 +29,12 @@ class Neuron:
     TAU_EXC = 2
     TAU_INH = 2
     TAU_SLOW = 750
-    TAU_EXC_SLOW = 300 # 780
+    TAU_EXC_SLOW = 400 # 780
     TAU_STIM = 2
     TAU_DECAY = 384
     TAU_SK = 250
     TAU_HALF_RISE_SK = 25
+    TAU_HALF_RISE_EXC = 200
     STIMULUS_TAU_DECAY = 2
     TAU_REFRACTORY = 2
 
@@ -134,6 +135,17 @@ class Neuron:
             exp_decay = -(self.t - (stim_time + (2 * Neuron.TAU_HALF_RISE_SK))) / self.TAU_SK
             return (1 / self.TAU_SK) * np.exp(exp_decay)
 
+    def beta_slow_exc(self, stim_time: float) -> float:
+        if self.t <= (stim_time + 2 * Neuron.TAU_HALF_RISE_EXC):
+            heaviside_term = self.Heaviside(self.t - stim_time) / self.TAU_EXC_SLOW
+            sigmoid_term_num = np.exp(
+                (5 * ((self.t - stim_time) - Neuron.TAU_HALF_RISE_EXC)) / Neuron.TAU_HALF_RISE_EXC)
+            sigmoid_term_den = 1 + sigmoid_term_num
+            return heaviside_term * sigmoid_term_num / sigmoid_term_den
+        else:
+            exp_decay = -(self.t - (stim_time + (2 * Neuron.TAU_HALF_RISE_EXC))) / self.TAU_EXC_SLOW
+            return (1 / self.TAU_EXC_SLOW) * np.exp(exp_decay)
+
     def g_gen(self, s_val, tau_val: float, s_set: list) -> float:
         return np.sum([s_val * self.alpha(tau_val, s) for s in s_set])
 
@@ -141,7 +153,7 @@ class Neuron:
         return np.sum([self.s_sk * self.beta(s) for s in self.spike_times])
 
     def slow_exc_func(self):
-        return np.sum([20 * self.s_pn_slow * self.beta(s) for s in self.spike_times])
+        return np.sum([20 * self.s_pn_slow * self.beta_slow_exc(s) for s in self.spike_times])
 
     def odor_dyn(self) -> float:
         if self.neuron_type == "PN":
@@ -291,7 +303,7 @@ class Neuron:
             self.g_inh = self.g_gen(self.s_inh, Neuron.TAU_INH, self.inh_times)
             self.g_slow = self.g_gen(self.s_slow, Neuron.TAU_SLOW, self.inh_times)
             self.g_stim = self.g_gen(self.s_stim, Neuron.TAU_STIM, self.stim_times)
-            #self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
+            # self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
             self.filter_exc_times()
             self.filter_inh_times()
             self.filter_stim_times()
