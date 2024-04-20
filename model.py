@@ -43,10 +43,26 @@ class Neuron:
     LAMBDA_ODOR_MAX = 3.6  # spikes / ms
     LAMBDA_MECH_MAX = 1.8  # spikes / ms
 
-    STIM_DURATION = 200  # ms
+    STIM_DURATION = 500  # ms
 
     SK_MU = 0.5
     SK_STDEV = 0.2
+
+    LN_ODOR_TAU_RISE = 0
+    LN_MECH_TAU_RISE = 300
+    LN_S_PN = 0.006 * .35
+    LN_S_PN_SLOW = 0
+    LN_S_INH = 0.015 * 1.15
+    LN_S_SLOW = 0.04
+    LN_L_STIM = 0.0026
+
+    PN_ODOR_TAU_RISE = 35
+    PN_MECH_TAU_RISE = 0
+    PN_S_PN = 0.006
+    PN_S_PN_SLOW = 0.02 * 1.5
+    PN_S_INH = 0.0169 * 1.35
+    PN_S_SLOW = 0.0338
+    PN_S_STIM = 0.004
 
     def __init__(self, t_stim_on: float, lambda_odor: float, lambda_mech: float, neuron_type: str, neuron_id: int = 0):
         self.stim_times = []
@@ -57,7 +73,9 @@ class Neuron:
         self.t_stim_on = t_stim_on
         self.t_stim_off = t_stim_on + Neuron.STIM_DURATION
         self.exc_times = []
+        self.slow_exc_times = []
         self.inh_times = []
+        self.slow_inh_times = []
         self.g_sk_vals = []
         self.connected_neurons = []
         self.neuron_type = neuron_type
@@ -82,22 +100,22 @@ class Neuron:
         # reversal potentials (nondimensional)
 
         if self.neuron_type == "LN":
-            self.odor_tau_rise = 0
-            self.mech_tau_rise = 300
-            self.s_pn = 0.006 * .7
-            self.s_pn_slow = self.s_pn
-            self.s_inh = 0.015
-            self.s_slow = 0.04
-            self.s_stim = 0.0026
+            self.odor_tau_rise = Neuron.LN_ODOR_TAU_RISE
+            self.mech_tau_rise = Neuron.LN_MECH_TAU_RISE
+            self.s_pn = Neuron.LN_S_PN
+            self.s_pn_slow = Neuron.LN_S_PN_SLOW
+            self.s_inh = Neuron.LN_S_INH
+            self.s_slow = Neuron.LN_S_SLOW
+            self.s_stim = Neuron.LN_L_STIM
 
         else:  # self.type == "PN"
-            self.odor_tau_rise = 35
-            self.mech_tau_rise = 0
-            self.s_pn = 0.01
-            self.s_pn_slow = self.s_pn
-            self.s_inh = 0.0169 * 1.2
-            self.s_slow = 0.0338
-            self.s_stim = 0.004
+            self.odor_tau_rise = Neuron.PN_ODOR_TAU_RISE
+            self.mech_tau_rise = Neuron.PN_MECH_TAU_RISE
+            self.s_pn = Neuron.PN_S_PN
+            self.s_pn_slow = Neuron.PN_S_PN_SLOW
+            self.s_inh = Neuron.PN_S_INH
+            self.s_slow = Neuron.PN_S_SLOW
+            self.s_stim = Neuron.PN_S_STIM
             self.s_sk = NP_RANDOM_GENERATOR.normal(Neuron.SK_MU, Neuron.SK_STDEV)
             if self.s_sk < 0:
                 self.s_sk = 0
@@ -228,35 +246,21 @@ class Neuron:
             else:
                 return
 
-    def generate_firing_rates(self, duration, bin_size):
-        if duration % bin_size != 0:
-            raise Exception("bin size should divide duration")
+    def partition_spike_times(self, duration, bin_size):
+        partition = []
+        for i in range(int(duration / bin_size)):
+            partition.append([])
 
-        num_bins = int(duration / bin_size)
-
-        if num_bins <= 1:
-            return [len(self.spike_times) / duration]
-
-        # partition spike_counts into bins
-        maxes = np.linspace(bin_size, duration, num=bin_size)
-
-        bins = []
-
+        # fill bins
         index = 0
-        for max_ in maxes:
-            bin_ = []
-            while index < len(self.spike_times):
-                if spike := self.spike_times[index] < max_:
-                    bin_.append(spike)
+        bin_max = bin_size
+        for val in self.spike_times:
+            if val > bin_max:
                 index += 1
+                bin_max += bin_size
+            partition[index].append(val)
 
-            bins.append(bin_)
-
-        rates = []
-        for bin_ in bins:
-            rates.append(len(bin_) / bin_size * (1 / 1000))  # (adjusted for fires / sec)
-
-        return rates
+        return partition
 
     def render(self, vals: np.linspace):
         """creates a pyplot visualization of the voltage values"""
@@ -336,6 +340,14 @@ class Neuron:
         self.slow_exc_vals.append(self.g_exc_slow)
         self.g_exc_vals.append(self.g_exc)
 
+    def generate_firing_rates(self, duration, bin_size):
+        rates = []
+        partition = self.partition_spike_times(duration, bin_size)
+        print(f"{self.neuron_type} - {self.n_id} {partition}")
+        for bin_ in partition:
+            rates.append(len(bin_) / bin_size)
+        return rates
+
 
 class Glomerulus:
     PN_PN_PROBABILITY = 0.50
@@ -406,13 +418,14 @@ class Glomerulus:
 
     def get_normalized_average_firing_rates(self, duration, bin_size):
         """Returns normalized average firing rates for given time intervals, with PNs being returned first."""
-        pn_firing_rates = [pn.generate_firing_rates(duration, bin_size) for pn in self.pns]
-        ln_firing_rates = [ln.generate_firing_rates(duration, bin_size) for ln in self.lns]
-
+        pn_firing_rates: list[list] = [pn.generate_firing_rates(duration, bin_size) for pn in self.pns]
+        ln_firing_rates: list[list] = [ln.generate_firing_rates(duration, bin_size) for ln in self.lns]
+        print(f"RATES: + {pn_firing_rates}")
         avg_pn_firing_rates = []
         avg_ln_firing_rates = []
 
-        for i in range(len(pn_firing_rates)):
+        for i in range(len(pn_firing_rates[0])):
+            print(f"INDEX {i}")
             avg_pn_firing_rates.append(np.average([rates[i] for rates in pn_firing_rates]))
             avg_ln_firing_rates.append(np.average([rates[i] for rates in ln_firing_rates]))
 

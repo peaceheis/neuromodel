@@ -1,18 +1,19 @@
+import json
 import os
 from datetime import datetime
 
 import numpy as np
-import json
 from matplotlib import pyplot as plt
 
-from model import Network, DELTA_T
+from model import Network, DELTA_T, Neuron
 
 duration = 2000
 stim_time = 500
-bin_size = 50
+BIN_SIZE = 50
+assert(stim_time % BIN_SIZE == 0)
 steps = int(duration / DELTA_T)
-#prefix = json.load("config.json")["prefix"]
-prefix = r"C:\Users\wjtor\Patel Research\output"
+prefix = json.load(open("config.json"))["prefix"]
+
 network = Network(stim_time, "Additive", [0, 1, 2, 3, 4, 5])
 
 vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
@@ -20,15 +21,54 @@ vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
 for val in vals:
     network.update()
     print(val)
+
+
 # for neuron in network.glomeruli[0].get_neurons():
 #     neuron.render(vals)
 
-should_serialize = True
+def save_constants(prefix_):
+    constants = {
+        "V_EXC": Neuron.V_EXC,
+        "V_INH": Neuron.V_INH,
+        "TAU_INH": Neuron.TAU_INH,
+        "TAU_SLOW": Neuron.TAU_SLOW,
+        "TAU_EXC": Neuron.TAU_EXC,
+        "TAU_EXC_SLOW": Neuron.TAU_EXC_SLOW,
+        "TAU_STIM": Neuron.TAU_STIM,
+        "TAU_SK": Neuron.TAU_SK,
+        "STIM_DURATION": Neuron.STIM_DURATION,
+
+        "SK_MU": Neuron.SK_MU,
+        "SK_STDEV": Neuron.SK_STDEV,
+
+        "LN_ODOR_TAU_RISE": Neuron.LN_ODOR_TAU_RISE,
+        "LN_MECH_TAU_RISE": Neuron.LN_MECH_TAU_RISE,
+        "LN_S_PN": Neuron.LN_S_PN,
+        "LN_S_PN_SLOW": Neuron.LN_S_PN_SLOW,
+        "LN_S_INH": Neuron.LN_S_INH,
+        "LN_S_SLOW": Neuron.LN_S_SLOW,
+        "LN_L_STIM": Neuron.LN_L_STIM,
+
+        "PN_ODOR_TAU_RISE": Neuron.PN_ODOR_TAU_RISE,
+        "PN_MECH_TAU_RISE": Neuron.PN_MECH_TAU_RISE,
+        "PN_S_PN": Neuron.PN_S_PN,
+        "PN_S_PN_SLOW": Neuron.PN_S_PN_SLOW,
+        "PN_S_INH": Neuron.PN_S_INH,
+        "PN_S_SLOW": Neuron.PN_S_SLOW,
+        "PN_S_STIM": Neuron.PN_S_STIM
+
+    }
+
+    json.dump(constants, open(prefix_ + "constants.json", "w"), indent=4)
+
+
+should_serialize = False
 
 if should_serialize:
     rn = datetime.now()
     prefix = prefix + f"{rn.year}{rn.month}{rn.day}-{rn.hour}.{rn.minute}.{rn.second}-{rn.microsecond}/"
     os.mkdir(prefix)
+    save_constants(prefix)
 
 totaldata = []
 for i, glomerulus in enumerate(network.glomeruli):
@@ -63,11 +103,11 @@ for i, glomerulus in enumerate(network.glomeruli):
     else:
         plt.show()
 
-for neuron in glomerulus.get_neurons():
-    print(
-        f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
-    print(
-        f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+    for neuron in glomerulus.get_neurons():
+        print(
+            f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+        print(
+            f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
 
 plt.figure()
 plt.title("Total Glomerular Activity")
@@ -77,28 +117,45 @@ if should_serialize:
 else:
     plt.show()
 
-for neuron in network.glomeruli[3].get_neurons():
-    neuron.render(vals)
-    '''plt.figure()
-    plt.title(f"Neuron {neuron.n_id} G Sk")
-    plt.plot(np.multiply(10, neuron.g_sk_vals))
-    plt.plot(neuron.voltages)
-    '''
-plt.show()
+# for neuron in network.glomeruli[3].get_neurons():
+#     plt.figure()
+#     plt.title(f"Neuron {neuron.n_id} G Sk")
+#     plt.plot(np.multiply(10, neuron.g_sk_vals))
+#     plt.plot(neuron.voltages)
+#     plt.show()
 
-    # plt.figure(16 + i)
-    # plt.title(f"Glomerulus {i} PN Rates")
-    # plt.bar(rate_bins, pn_rates)
-    #
-    # plt.show()
-    #
-    #
-    # plt.figure(32 + i)
-    # plt.title(f"Glomerulus {i} Ln Rates")
-    # plt.bar(rate_bins, ln_rates)
-    # print("ok here")
-    # plt.show()
-    # print("yay!")
+for glomerulus in network.glomeruli:
+    plt.figure()
+    plt.title(f"Glomerulus {glomerulus.g_id} PN Firing Rates")
+    x = np.linspace(0, duration, num=int(duration / BIN_SIZE))
+    plt.bar(x, glomerulus.get_normalized_average_firing_rates(duration, BIN_SIZE)[0])
+    if should_serialize:
+        plt.savefig(prefix + f"{glomerulus.g_id}_rates_pn")
+    else:
+        plt.show()
+
+    plt.figure()
+    plt.title(f"Glomerulus {glomerulus.g_id} LN Firing Rates")
+    x = np.linspace(0, duration, num=int(duration / BIN_SIZE))
+    plt.bar(x, glomerulus.get_normalized_average_firing_rates(duration, BIN_SIZE)[1])
+    if should_serialize:
+        plt.savefig(prefix + f"{glomerulus.g_id}_rates_ln")
+    else:
+        plt.show()
+
+# plt.figure(16 + i)
+# plt.title(f"Glomerulus {i} PN Rates")
+# plt.bar(rate_bins, pn_rates)
+#
+# plt.show()
+#
+#
+# plt.figure(32 + i)
+# plt.title(f"Glomerulus {i} Ln Rates")
+# plt.bar(rate_bins, ln_rates)
+# print("ok here")
+# plt.show()
+# print("yay!")
 
 # for i in range(6):
 # glomerulus = Glomerulus(1000, Neuron.LAMBDA_ODOR_MAX, Neuron.LAMBDA_MECH_MAX)
