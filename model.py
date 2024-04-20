@@ -4,7 +4,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 1435722988947938279
+SEED = 517238164375398102
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
 
@@ -343,9 +343,8 @@ class Neuron:
     def generate_firing_rates(self, duration, bin_size):
         rates = []
         partition = self.partition_spike_times(duration, bin_size)
-        print(f"{self.neuron_type} - {self.n_id} {partition}")
         for bin_ in partition:
-            rates.append(len(bin_) / bin_size)
+            rates.append(len(bin_))
         return rates
 
 
@@ -418,24 +417,24 @@ class Glomerulus:
 
     def get_normalized_average_firing_rates(self, duration, bin_size):
         """Returns normalized average firing rates for given time intervals, with PNs being returned first."""
-        pn_firing_rates: list[list] = [pn.generate_firing_rates(duration, bin_size) for pn in self.pns]
-        ln_firing_rates: list[list] = [ln.generate_firing_rates(duration, bin_size) for ln in self.lns]
-        print(f"RATES: + {pn_firing_rates}")
-        avg_pn_firing_rates = []
-        avg_ln_firing_rates = []
+        pn_baseline = sum(neuron.generate_firing_rates(duration, bin_size)[0] for neuron in self.pns)
+        ln_baseline = sum(neuron.generate_firing_rates(duration, bin_size)[0] for neuron in self.lns)
+        pn_rates = []
+        ln_rates = []
 
-        for i in range(len(pn_firing_rates[0])):
-            print(f"INDEX {i}")
-            avg_pn_firing_rates.append(np.average([rates[i] for rates in pn_firing_rates]))
-            avg_ln_firing_rates.append(np.average([rates[i] for rates in ln_firing_rates]))
+        for i in range(int(duration/bin_size)):
+            sum_ = 0
+            for neuron in self.pns:
+                sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
+            pn_rates.append(sum_ / pn_baseline)
 
-        pn_bg = avg_pn_firing_rates[0]
-        normalized_avg_pn_firing_rates = [rate / pn_bg for rate in avg_pn_firing_rates]
-
-        ln_bg = avg_pn_firing_rates[0]
-        normalized_avg_ln_firing_rates = [rate / ln_bg for rate in avg_ln_firing_rates]
-
-        return normalized_avg_pn_firing_rates, normalized_avg_ln_firing_rates
+        for i in range(int(duration / bin_size)):
+            sum_ = 0
+            for neuron in self.lns:
+                sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
+            ln_rates.append(sum_ / ln_baseline)
+        print(f"RATES: {pn_rates}, {ln_rates}")
+        return pn_rates, ln_rates
 
 
 class Network:

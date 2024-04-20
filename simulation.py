@@ -7,10 +7,10 @@ from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T, Neuron
 
-duration = 2000
-stim_time = 100
-BIN_SIZE = 50
-assert(stim_time % BIN_SIZE == 0)
+duration = 5000
+stim_time = 500
+BIN_SIZE = duration / 10
+assert(duration % BIN_SIZE == 0)
 steps = int(duration / DELTA_T)
 prefix = json.load(open("config.json"))["prefix"]
 
@@ -62,7 +62,7 @@ def save_constants(prefix_):
     json.dump(constants, open(prefix_ + "constants.json", "w"), indent=4)
 
 
-should_serialize = False
+should_serialize = True
 
 if should_serialize:
     rn = datetime.now()
@@ -97,12 +97,12 @@ for i, glomerulus in enumerate(network.glomeruli):
     axs[1, 1].bar([i for i in range(1, 17)], [neuron.total_inhibition for neuron in glomerulus.get_neurons()],
                   width=0.25, color=colors)
     axs[1, 1].set_xlabel("Inhibition Amounts")
-''''''
-if should_serialize:
-    plt.savefig(prefix + f"{i}.png")
-else:
-    pass
-#plt.show()
+    ''''''
+    if should_serialize:
+        plt.savefig(prefix + f"{i}.png")
+    else:
+        pass
+    #plt.show()
 
     for neuron in glomerulus.get_neurons():
         print(
@@ -129,7 +129,9 @@ for glomerulus in network.glomeruli:
     plt.figure()
     plt.title(f"Glomerulus {glomerulus.g_id} PN Firing Rates")
     x = np.linspace(0, duration, num=int(duration / BIN_SIZE))
-    plt.bar(x, glomerulus.get_normalized_average_firing_rates(duration, BIN_SIZE)[0])
+
+    pn_rates, ln_rates = glomerulus.get_normalized_average_firing_rates(duration, BIN_SIZE)
+    plt.bar(x, pn_rates, width=10, align='edge', ec='blue')
     if should_serialize:
         plt.savefig(prefix + f"{glomerulus.g_id}_rates_pn")
     else:
@@ -138,8 +140,8 @@ for glomerulus in network.glomeruli:
 
     plt.figure()
     plt.title(f"Glomerulus {glomerulus.g_id} LN Firing Rates")
-    x = np.linspace(0, duration, num=int(duration / BIN_SIZE))
-    plt.bar(x, glomerulus.get_normalized_average_firing_rates(duration, BIN_SIZE)[1])
+    print(x)
+    plt.bar(x, ln_rates, width=10, align='edge', ec='blue')
     if should_serialize:
         plt.savefig(prefix + f"{glomerulus.g_id}_rates_ln")
     else:
