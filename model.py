@@ -4,7 +4,7 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 517238164375398102
+SEED = 954815183228097
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
 
@@ -29,12 +29,12 @@ class Neuron:
     TAU_EXC = 2
     TAU_INH = 2
     TAU_SLOW = 750
-    TAU_EXC_SLOW = 300  # 780
+    TAU_EXC_SLOW = 500  # 780
     TAU_STIM = 2
     TAU_DECAY = 384
     TAU_SK = 250
     TAU_HALF_RISE_SK = 25
-    TAU_HALF_RISE_EXC = 800
+    TAU_HALF_RISE_EXC = 400
     STIMULUS_TAU_DECAY = 2
     TAU_REFRACTORY = 2
 
@@ -50,16 +50,16 @@ class Neuron:
 
     LN_ODOR_TAU_RISE = 0
     LN_MECH_TAU_RISE = 300
-    LN_S_PN = 0.006 * .35
+    LN_S_PN = 0.006 * .5
     LN_S_PN_SLOW = 0
-    LN_S_INH = 0.015 * 1.15
+    LN_S_INH = 0.015 #* 1.15
     LN_S_SLOW = 0.04
     LN_L_STIM = 0.0026
 
     PN_ODOR_TAU_RISE = 35
     PN_MECH_TAU_RISE = 0
     PN_S_PN = 0.006
-    PN_S_PN_SLOW = 0.02 * 1.5
+    PN_S_PN_SLOW = 0.005
     PN_S_INH = 0.0169 * 1.35
     PN_S_SLOW = 0.0338
     PN_S_STIM = 0.004
@@ -171,7 +171,7 @@ class Neuron:
         return np.sum([self.s_sk * self.beta(s) for s in self.spike_times])
 
     def slow_exc_func(self):
-        return np.sum([50 * self.s_pn_slow * self.beta_slow_exc(s) for s in self.spike_times])
+        return np.sum([300 * self.s_pn_slow * self.beta_slow_exc(s) for s in self.spike_times])
 
     def odor_dyn(self) -> float:
         if self.neuron_type == "PN":
@@ -273,15 +273,15 @@ class Neuron:
         plt.figure()
         plt.title(
             f"Voltage - {self.neuron_type} {self.n_id} - Lambda Odor: {self.lambda_odor}, Lambda Mech: {self.lambda_mech}")
-        # plt.plot(vals, self.voltages, color="red" if self.neuron_type == "LN" else "blue", label = 'voltage')
-        if self.neuron_type == "PN":
-            plt.plot(vals, self.g_sk_vals, color='purple', label='g_sk')
-            plt.plot(vals, self.g_slow_vals, color='orange', label='g_slow')
-            # plt.plot(vals, self.g_inh_vals, color='green', label='g_inh')
-            plt.plot(vals, self.slow_exc_vals, color='pink', label='slow excitation')
-            plt.plot(vals, self.g_exc_vals, color='grey', label='excitation')
-            plt.legend()
-            # plt.show()
+        #plt.plot(vals, self.voltages, color="pink" if self.neuron_type == "LN" else "blue", label='voltage', alpha=0.25)
+        # if self.neuron_type == "PN":
+        plt.plot(vals, self.g_sk_vals, color='purple', label='g_sk')
+        plt.plot(vals, self.g_slow_vals, color='orange', label='g_slow')
+        # plt.plot(vals, self.g_inh_vals, color='green', label='g_inh')
+        plt.plot(vals, self.slow_exc_vals, color='red', label='slow excitation')
+        plt.plot(vals, self.g_exc_vals, color='grey', label='excitation')
+        plt.legend()
+        # plt.show()
         pass
 
     def update(self):
@@ -307,7 +307,7 @@ class Neuron:
             self.g_inh = self.g_gen(self.s_inh, Neuron.TAU_INH, self.inh_times)
             self.g_slow = self.g_gen(self.s_slow, Neuron.TAU_SLOW, self.inh_times)
             self.g_stim = self.g_gen(self.s_stim, Neuron.TAU_STIM, self.stim_times)
-            # self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
+            self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
             self.filter_exc_times()
             self.filter_inh_times()
             self.filter_stim_times()
@@ -333,9 +333,9 @@ class Neuron:
 
         self.t += DELTA_T
         self.voltages.append(self.v)
-        self.g_inh_vals.append(self.g_inh * 0.4)
-        self.g_slow_vals.append(self.g_slow * 5)
-        self.g_sk_vals.append(self.g_sk * 5)
+        self.g_inh_vals.append(self.g_inh)
+        self.g_slow_vals.append(self.g_slow)
+        self.g_sk_vals.append(self.g_sk)
         self.spike_counts.append(len(self.spike_times))
         self.slow_exc_vals.append(self.g_exc_slow)
         self.g_exc_vals.append(self.g_exc)
@@ -351,7 +351,7 @@ class Neuron:
 class Glomerulus:
     PN_PN_PROBABILITY = 0.50
     PN_LN_PROBABILITY = 0.50
-    LN_PN_PROBABILITY = 0.40
+    LN_PN_PROBABILITY = 0.45
     LN_LN_PROBABILITY = 0.25  # .25
     count = 0
 
@@ -365,8 +365,8 @@ class Glomerulus:
         self.neurons.extend(self.lns)
         self.g_id = g_id
 
-        print(f"{self.pns}")
-        print(f"NEURON COUNTS: {len(self.pns)}, {len(self.lns)}")
+        #print(f"{self.pns}")
+        #print(f"NEURON COUNTS: {len(self.pns)}, {len(self.lns)}")
 
         # build synapse network
         for pn in self.pns:
@@ -375,20 +375,20 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.PN_PN_PROBABILITY):
-                        print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto PN {target.n_id}")
+                        #print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto PN {target.n_id}")
                         pn.connected_neurons.append(target)
                         target.total_excitation += 1
 
             for target in self.lns:
                 if random_choice(Glomerulus.PN_LN_PROBABILITY):
-                    print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto LN {target.n_id}")
+                    #print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto LN {target.n_id}")
                     pn.connected_neurons.append(target)
                     target.total_excitation += 1
 
         for ln in self.lns:
             for target in self.pns:
                 if random_choice(Glomerulus.LN_PN_PROBABILITY):
-                    print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto PN {target.n_id}")
+                    #print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto PN {target.n_id}")
                     ln.connected_neurons.append(target)
                     target.total_inhibition += 1
 
@@ -397,7 +397,7 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.LN_LN_PROBABILITY):
-                        print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto LN {target.n_id}")
+                        #print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto LN {target.n_id}")
                         ln.connected_neurons.append(target)
                         target.total_inhibition += 1
 
@@ -422,18 +422,18 @@ class Glomerulus:
         pn_rates = []
         ln_rates = []
 
-        for i in range(int(duration/bin_size)):
+        for i in range(int(duration / bin_size)):
             sum_ = 0
             for neuron in self.pns:
                 sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
-            pn_rates.append(sum_ / pn_baseline)
+            pn_rates.append(sum_)# / pn_baseline)
 
         for i in range(int(duration / bin_size)):
             sum_ = 0
             for neuron in self.lns:
                 sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
-            ln_rates.append(sum_ / ln_baseline)
-        print(f"RATES: {pn_rates}, {ln_rates}")
+            ln_rates.append(sum_)# / ln_baseline)
+        #print(f"RATES: {pn_rates}, {ln_rates}")
         return pn_rates, ln_rates
 
 

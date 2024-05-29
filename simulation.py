@@ -7,9 +7,9 @@ from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T, Neuron
 
-duration = 5000
-stim_time = 500
-BIN_SIZE = duration / 10
+duration = 2000
+stim_time = 100
+BIN_SIZE = duration / 20
 assert(duration % BIN_SIZE == 0)
 steps = int(duration / DELTA_T)
 prefix = json.load(open("config.json"))["prefix"]
@@ -20,10 +20,10 @@ vals = np.linspace(0, duration, steps)  # linspace for iteration of the network
 
 for val in vals:
     network.update()
-    print(val)
+    #print(val)
 
 
-for neuron in network.glomeruli[0].get_neurons():
+for neuron in network.glomeruli[3].get_neurons():
      neuron.render(vals)
 
 def save_constants(prefix_):
@@ -104,11 +104,11 @@ for i, glomerulus in enumerate(network.glomeruli):
         pass
     #plt.show()
 
-    for neuron in glomerulus.get_neurons():
-        print(
-            f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
-        print(
-            f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+    #for neuron in glomerulus.get_neurons():
+        #print(
+            #f"Glomerulus {i} - Neuron {neuron.n_id} Inhibition {neuron.total_inhibition}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
+        #print(
+            #f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
 
 plt.figure()
 plt.title("Total Glomerular Activity")
@@ -140,7 +140,7 @@ for glomerulus in network.glomeruli:
 
     plt.figure()
     plt.title(f"Glomerulus {glomerulus.g_id} LN Firing Rates")
-    print(x)
+    #print(x)
     plt.bar(x, ln_rates, width=10, align='edge', ec='blue')
     if should_serialize:
         plt.savefig(prefix + f"{glomerulus.g_id}_rates_ln")
