@@ -1,10 +1,12 @@
 from copy import copy
 import json
+import random
+from statistics import mean
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-SEED = 954815183228097
+SEED = random.randint(10000000, 10000000000000)
 NP_RANDOM_GENERATOR = np.random.default_rng(SEED)
 DELTA_T = 0.1
 
@@ -50,9 +52,9 @@ class Neuron:
 
     LN_ODOR_TAU_RISE = 0
     LN_MECH_TAU_RISE = 300
-    LN_S_PN = 0.006 * .5
+    LN_S_PN = 0.006
     LN_S_PN_SLOW = 0
-    LN_S_INH = 0.015 #* 1.15
+    LN_S_INH = 0.015
     LN_S_SLOW = 0.04
     LN_L_STIM = 0.0026
 
@@ -72,10 +74,14 @@ class Neuron:
         self.dv_vals = []
         self.t_stim_on = t_stim_on
         self.t_stim_off = t_stim_on + Neuron.STIM_DURATION
-        self.exc_times = []
-        self.slow_exc_times = []
-        self.inh_times = []
-        self.slow_inh_times = []
+        self.excitation_level = 0.0
+        self.slow_excitation_level = 0.0
+        self.inhibition_level = 0.0
+        self.slow_inhibition_level = 0.0
+        self.excitation_time = 0.0
+        self.slow_excitation_time = 0.0
+        self.inhibition_time = 0.0
+        self.slow_inhibition_time = 0.0
         self.g_sk_vals = []
         self.connected_neurons = []
         self.neuron_type = neuron_type
@@ -139,9 +145,8 @@ class Neuron:
             return 0
 
     def alpha(self, tau: float, spike_time: float | int) -> float:
-        heaviside_term = (self.Heaviside(self.t - spike_time)) / tau
-        exp_decay_term = np.exp((self.t - spike_time) / tau)
-        return heaviside_term * exp_decay_term
+        exp_decay_term = np.exp(-(self.t - spike_time) / tau)
+        return exp_decay_term
 
     def beta(self, stim_time: float) -> float:
         if self.t <= (stim_time + 2 * Neuron.TAU_HALF_RISE_SK):
@@ -164,8 +169,8 @@ class Neuron:
             exp_decay = -(self.t - (stim_time + (2 * Neuron.TAU_HALF_RISE_EXC))) / self.TAU_EXC_SLOW
             return (1 / self.TAU_EXC_SLOW) * np.exp(exp_decay)
 
-    def g_gen(self, s_val, tau_val: float, s_set: list) -> float:
-        return np.sum([s_val * self.alpha(tau_val, s) for s in s_set])
+    def g_gen(self, s_val, tau_val: float, time: float) -> float:
+        return s_val * self.alpha(tau_val, time)
 
     def g_sk_func(self):
         return np.sum([self.s_sk * self.beta(s) for s in self.spike_times])
@@ -220,24 +225,26 @@ class Neuron:
 
         if self.neuron_type == "LN":
             for neuron in self.connected_neurons:
-                neuron.inh_times.append(self.t)
+                neuron.inhibit()
         else:
             for neuron in self.connected_neurons:
-                neuron.exc_times.append(self.t)
+                neuron.excite()
 
-    def filter_exc_times(self):
-        for val in self.exc_times:
-            if self.t - val > Neuron.TAU_EXC * 3:
-                self.exc_times.remove(val)
-            else:
-                return
+    def excite(self):
+        excitation_strength = Neuron.PN_S_PN if self.neuron_type == "PN" else Neuron.LN_S_PN
+        slow_excitation_strength = Neuron.PN_S_PN_SLOW if self.neuron_type == "PN" else Neuron.LN_S_PN_SLOW
+        self.excitation_level = self.excitation_level * np.exp(-(self.t - self.excitation_time) / self.TAU_EXC) + excitation_strength
+        self.slow_excitation_level = self.slow_excitation_level + np.exp(-(self.t - self.slow_excitation_time) / self.TAU_EXC_SLOW) + slow_excitation_strength
+        self.excitation_time = self.TAU_EXC
+        self.slow_excitation_time = self.TAU_EXC_SLOW
 
-    def filter_inh_times(self):
-        for val in self.inh_times:
-            if self.t - val > Neuron.TAU_INH * 3:
-                self.inh_times.remove(val)
-            else:
-                return
+    def inhibit(self):
+        inhibition_strength = Neuron.PN_S_INH if self.neuron_type == "PN" else Neuron.LN_S_SLOW
+        slow_inhibition_strength = Neuron.PN_S_SLOW if self.neuron_type == "PN" else Neuron.LN_S_SLOW
+        self.excitation_level = self.excitation_level * np.exp(-(self.t - self.excitation_time) / self.TAU_INH) + inhibition_strength
+        self.slow_excitation_level = self.slow_excitation_level + np.exp(-(self.t - self.slow_excitation_time) / self.TAU_SLOW) + slow_inhibition_strength
+        self.inhibition_time = self.TAU_INH
+        self.slow_inhibition_time = self.TAU_SLOW
 
     def filter_stim_times(self):
         for val in self.stim_times:
@@ -303,39 +310,37 @@ class Neuron:
                 self.stim_times.append(self.t)
 
             # update everything
-            self.g_exc = self.g_gen(self.s_pn, Neuron.TAU_EXC, self.exc_times)
-            self.g_inh = self.g_gen(self.s_inh, Neuron.TAU_INH, self.inh_times)
-            self.g_slow = self.g_gen(self.s_slow, Neuron.TAU_SLOW, self.inh_times)
-            self.g_stim = self.g_gen(self.s_stim, Neuron.TAU_STIM, self.stim_times)
-            self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
-            self.filter_exc_times()
-            self.filter_inh_times()
+            self.g_exc = self.g_gen(self.excitation_level, Neuron.TAU_EXC, self.excitation_time)
+            self.g_inh = self.g_gen(self.inhibition_level, Neuron.TAU_INH, self.inhibition_time)
+            self.g_slow = self.g_gen(self.slow_inhibition_level, Neuron.TAU_SLOW, self.slow_inhibition_time)
+            self.g_stim = self.g_gen(self.s_stim, Neuron.TAU_STIM, self.slow_excitation_time)
+            # self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.exc_times)
             self.filter_stim_times()
 
             if self.neuron_type == "PN":
                 self.g_sk = self.g_sk_func()
-                self.g_exc_slow = self.slow_exc_func()
+                self.g_exc_slow = self.g_gen(self.s_pn_slow, Neuron.TAU_EXC_SLOW, self.slow_excitation_time)
                 self.dv_dt = (-1 * (self.v - self.V_L) / self.TAU_V) - \
-                             (self.g_sk * (self.v - self.V_SK)) - \
-                             (self.g_stim * (self.v - self.V_STIM)) - \
-                             (self.g_exc * (self.v - self.V_EXC)) - \
-                             (self.g_inh * (self.v - self.V_INH)) - \
-                             (self.g_slow * (self.v - self.V_INH)) - \
-                             (self.g_exc_slow * (self.v - self.V_EXC))
+                             (self.g_sk * (self.v - self.V_SK)) / self.TAU_SK - \
+                             (self.g_exc * (self.v - self.V_EXC)) / self.TAU_EXC - \
+                             (self.g_inh * (self.v - self.V_INH)) / self.TAU_INH- \
+                             (self.g_slow * (self.v - self.V_INH))  / self.TAU_SLOW- \
+                             (self.g_exc_slow * (self.v - self.V_EXC)) / self.TAU_EXC_SLOW
+       #         (self.g_stim * (self.v - self.V_STIM)) - \
 
             else:  # self.type == "LN"
                 self.dv_dt = (-1 * (self.v - self.V_L) / self.TAU_V) - \
-                             (self.g_stim * (self.v - self.V_STIM)) - \
-                             (self.g_exc * (self.v - self.V_EXC)) - \
-                             (self.g_inh * (self.v - self.V_INH)) - \
-                             (self.g_slow * (self.v - self.V_INH)) - \
-                             (self.g_exc_slow * (self.v - self.V_EXC))
+                             (self.g_exc * (self.v - self.V_EXC)) / self.TAU_EXC - \
+                             (self.g_inh * (self.v - self.V_INH)) / self.TAU_INH- \
+                             (self.g_slow * (self.v - self.V_INH)) / self.TAU_SLOW- \
+                             (self.g_exc_slow * (self.v - self.V_EXC)) / self.TAU_EXC_SLOW
+              #  (self.g_stim * (self.v - self.V_STIM)) - \
 
-        self.t += DELTA_T
+            self.t += DELTA_T
         self.voltages.append(self.v)
-        self.g_inh_vals.append(self.g_inh)
-        self.g_slow_vals.append(self.g_slow)
-        self.g_sk_vals.append(self.g_sk)
+        self.g_inh_vals.append(self.g_inh * 0.4)
+        self.g_slow_vals.append(self.g_slow * 5)
+        self.g_sk_vals.append(self.g_sk * 5)
         self.spike_counts.append(len(self.spike_times))
         self.slow_exc_vals.append(self.g_exc_slow)
         self.g_exc_vals.append(self.g_exc)
@@ -344,15 +349,15 @@ class Neuron:
         rates = []
         partition = self.partition_spike_times(duration, bin_size)
         for bin_ in partition:
-            rates.append(len(bin_))
+            rates.append(len(bin_)/bin_size)
         return rates
 
 
 class Glomerulus:
-    PN_PN_PROBABILITY = 0.50
-    PN_LN_PROBABILITY = 0.50
-    LN_PN_PROBABILITY = 0.45
-    LN_LN_PROBABILITY = 0.25  # .25
+    PN_PN_PROBABILITY = 0.02
+    PN_LN_PROBABILITY = 0.05
+    LN_PN_PROBABILITY = 0.18
+    LN_LN_PROBABILITY = 0.08 # .25
     count = 0
 
     def __init__(self, stim_time: float, lambda_odor: float, lambda_mech: float, g_id: int):
@@ -365,8 +370,8 @@ class Glomerulus:
         self.neurons.extend(self.lns)
         self.g_id = g_id
 
-        #print(f"{self.pns}")
-        #print(f"NEURON COUNTS: {len(self.pns)}, {len(self.lns)}")
+        print(f"{self.pns}")
+        print(f"NEURON COUNTS: {len(self.pns)}, {len(self.lns)}")
 
         # build synapse network
         for pn in self.pns:
@@ -375,20 +380,20 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.PN_PN_PROBABILITY):
-                        #print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto PN {target.n_id}")
+                        print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto PN {target.n_id}")
                         pn.connected_neurons.append(target)
                         target.total_excitation += 1
 
             for target in self.lns:
                 if random_choice(Glomerulus.PN_LN_PROBABILITY):
-                    #print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto LN {target.n_id}")
+                    print(f"Glomerulus {self.g_id} - PN {pn.n_id} synapsing onto LN {target.n_id}")
                     pn.connected_neurons.append(target)
                     target.total_excitation += 1
 
         for ln in self.lns:
             for target in self.pns:
                 if random_choice(Glomerulus.LN_PN_PROBABILITY):
-                    #print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto PN {target.n_id}")
+                    print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto PN {target.n_id}")
                     ln.connected_neurons.append(target)
                     target.total_inhibition += 1
 
@@ -397,7 +402,7 @@ class Glomerulus:
                     continue
                 else:
                     if random_choice(Glomerulus.LN_LN_PROBABILITY):
-                        #print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto LN {target.n_id}")
+                        print(f"Glomerulus {self.g_id} - LN {ln.n_id} synapsing onto LN {target.n_id}")
                         ln.connected_neurons.append(target)
                         target.total_inhibition += 1
 
@@ -417,24 +422,17 @@ class Glomerulus:
 
     def get_normalized_average_firing_rates(self, duration, bin_size):
         """Returns normalized average firing rates for given time intervals, with PNs being returned first."""
-        pn_baseline = sum(neuron.generate_firing_rates(duration, bin_size)[0] for neuron in self.pns)
-        ln_baseline = sum(neuron.generate_firing_rates(duration, bin_size)[0] for neuron in self.lns)
-        pn_rates = []
-        ln_rates = []
+        pn_rates = [neuron.generate_firing_rates(duration, bin_size) for neuron in self.pns]
+        ln_rates = [neuron.generate_firing_rates(duration, bin_size) for neuron in self.lns]
+        avg_pn_rates = []
+        avg_ln_rates = []
 
-        for i in range(int(duration / bin_size)):
-            sum_ = 0
-            for neuron in self.pns:
-                sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
-            pn_rates.append(sum_)# / pn_baseline)
+        for i in range(int(duration/bin_size)):
+            avg_pn_rates.append(mean([rate[i] for rate in pn_rates]))
+            avg_ln_rates.append(mean([rate[i] for rate in ln_rates]))
 
-        for i in range(int(duration / bin_size)):
-            sum_ = 0
-            for neuron in self.lns:
-                sum_ += neuron.generate_firing_rates(duration, bin_size)[i]
-            ln_rates.append(sum_)# / ln_baseline)
-        #print(f"RATES: {pn_rates}, {ln_rates}")
-        return pn_rates, ln_rates
+        print(f"RATES: {pn_rates}, {ln_rates}")
+        return avg_pn_rates, avg_ln_rates
 
 
 class Network:
