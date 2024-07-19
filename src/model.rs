@@ -4,9 +4,12 @@ use rand::distributions::{DistIter, Standard};
 use rand_distr::{Normal, Distribution};
 use rand::Rng;
 use rand::rngs::SmallRng;
+use serde::{Deserialize, Serialize, Serializer};
+use serde::ser::SerializeSeq;
 use vec_to_array::vec_to_array;
 
 use crate::model::NeuronType::PN;
+use crate::{DURATION, STIM_TIME};
 
 pub(crate) const DELTA_T: f64 = 0.1;
 
@@ -30,14 +33,14 @@ pub struct Neuron {
     dv_dt: f64,
     lambda_odor: f64,
     lambda_mech: f64,
-    spike_times: Vec<f64>,
-    voltages: Vec<f64>,
-    g_inh_vals: Vec<f64>,
-    g_slow_vals: Vec<f64>,
-    g_sk_vals: Vec<f64>,
-    spike_counts: Vec<usize>,
-    slow_exc_vals: Vec<f64>,
-    g_exc_vals: Vec<f64>,
+    pub spike_times: Vec<f64>,
+    pub voltages: Vec<f64>,
+    pub g_inh_vals: Vec<f64>,
+    pub g_slow_vals: Vec<f64>,
+    pub g_sk_vals: Vec<f64>,
+    pub spike_counts: Vec<usize>,
+    pub g_slow_exc_vals: Vec<f64>,
+    pub g_exc_vals: Vec<f64>,
     refractory_counter: f64,
     odor_tau_rise: f64,
     mech_tau_rise: f64,
@@ -47,8 +50,8 @@ pub struct Neuron {
     s_slow: f64,
     s_sk: f64,
     s_stim: f64,
-    excitation_times: Vec<f64>,
-    inhibition_times: Vec<f64>,
+    pub excitation_times: Vec<f64>,
+    pub inhibition_times: Vec<f64>,
     g_exc: f64,
     g_inh: f64,
     g_slow: f64,
@@ -133,7 +136,7 @@ impl Neuron {
             g_slow_vals: Vec::new(),
             g_sk_vals: Vec::new(),
             spike_counts: Vec::new(),
-            slow_exc_vals: Vec::new(),
+            g_slow_exc_vals: Vec::new(),
             g_exc_vals: Vec::new(),
             refractory_counter: 0.0,
             odor_tau_rise,
@@ -333,7 +336,7 @@ impl Neuron {
             self.g_slow_vals.push(self.g_slow * 5f64);
             self.g_sk_vals.push(self.g_sk * 5f64);
             self.spike_counts.push(self.spike_times.len());
-            self.slow_exc_vals.push(self.g_exc_slow);
+            self.g_slow_exc_vals.push(self.g_exc_slow);
             self.g_exc_vals.push(self.g_exc);
             self.g_stim_vals.push(self.g_stim);
 
@@ -352,6 +355,31 @@ impl Neuron {
     }
 }
 
+#[derive(Debug, Serialize)]
+struct SerializedNeuron {
+    neuron_type: String,
+    excitation_vals: Vec<f64>,
+    slow_excitation_vals: Vec<f64>,
+    inhibition_vals: Vec<f64>,
+    slow_inhibition_vals: Vec<f64>,
+    g_sk_vals: Vec<f64>,
+    spike_times: Vec<f64>
+}
+
+impl SerializedNeuron {
+    fn from_neuron(neuron: &Neuron) -> Self {
+        SerializedNeuron {
+            neuron_type: if neuron.neuron_type == NeuronType::PN { String::from("pn")} else {String::from("ln")},
+            excitation_vals: neuron.g_exc_vals.clone(),
+            slow_excitation_vals: neuron.g_slow_exc_vals.clone(),
+            inhibition_vals: neuron.g_inh_vals.clone(),
+            slow_inhibition_vals: neuron.g_slow_vals.clone(),
+            g_sk_vals: neuron.g_sk_vals.clone(),
+            spike_times: neuron.spike_times.clone()
+        }
+    }
+}
+
 
 pub(crate) enum NetworkType {
     Odor,
@@ -360,18 +388,19 @@ pub(crate) enum NetworkType {
     Normalized
 }
 
+
 pub(crate) struct Network<> {
-    neurons: [Neuron; 96],
-    connectivity_matrix: [Vec<usize>; 96],
+    pub neurons: [Neuron; 96],
+    pub connectivity_matrix: [Vec<usize>; 96],
     rng: SmallRng,
     t: f64,
 }
 
-impl Network<> {
-    const PN_PN_PROBABILITY: f64 = 0.02;
-    const PN_LN_PROBABILITY: f64 = 0.05;
-    const LN_PN_PROBABILITY: f64 = 0.18;
-    const LN_LN_PROBABILITY: f64 = 0.08; // .25
+impl Network {
+    const PN_PN_PROBABILITY: f64 = 0.75;
+    const PN_LN_PROBABILITY: f64 = 0.75;
+    const LN_PN_PROBABILITY: f64 = 0.38;
+    const LN_LN_PROBABILITY: f64 = 0.25; // .25
     pub(crate) fn new(stim_time: i32, network_type: NetworkType, affected_glomeruli: [i8; 6]) -> Self {
         let mut rng: SmallRng = SmallRng::from_thread_rng();
 
@@ -437,7 +466,7 @@ impl Network<> {
         }
 
         let neurons: [Neuron; 96] = vec_to_array!(neurons_vec, Neuron, 96);
-
+        println!("{:?}", connectivity_matrix);
         Network {
             neurons,
             connectivity_matrix,
@@ -468,9 +497,101 @@ impl Network<> {
             }
         }
 
-        println!("{}", self.neurons[50].dv_dt);
 
         self.t += DELTA_T;
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct SerializedNetwork {
+    dir: String,
+    neurons: Vec<SerializedNeuron>,
+    stim_time: i32,
+    duration: i32,
+    delta_t: f64
+}
+
+impl SerializedNetwork {
+    pub fn from_network(network: Network, dir: String) -> Self {
+        let serialized_neurons: Vec<SerializedNeuron> = network.neurons.iter().map(|neuron| SerializedNeuron::from_neuron(neuron)).collect();
+        SerializedNetwork {
+            dir,
+            neurons: serialized_neurons,
+            stim_time: STIM_TIME,
+            duration: DURATION,
+            delta_t: DELTA_T,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct Config {
+    V_EXC: f64,
+    V_INH: f64,
+    TAU_INH: f64,
+    TAU_SLOW: f64,
+    TAU_EXC: f64,
+    TAU_EXC_SLOW: f64,
+    TAU_STIM: f64,
+    TAU_SK: f64,
+    STIM_TIME: i32,
+    STIM_DURATION: f64,
+    SK_MU: f64,
+    SK_STDEV: f64,
+    LN_ODOR_TAU_RISE: f64,
+    LN_MECH_TAU_RISE: f64,
+    LN_S_PN: f64,
+    LN_S_PN_SLOW: f64,
+    LN_S_INH: f64,
+    LN_S_SLOW: f64,
+    LN_S_STIM: f64,
+    PN_ODOR_TAU_RISE: f64,
+    PN_MECH_TAU_RISE: f64,
+    PN_S_PN: f64,
+    PN_S_PN_SLOW: f64,
+    PN_S_INH: f64,
+    PN_S_SLOW: f64,
+    PN_S_STIM: f64,
+    PN_PN_PROB: f64,
+    PN_LN_PROB: f64,
+    LN_PN_PROB: f64,
+    LN_LN_PROB: f64,
+}
+
+impl Config {
+    pub fn create() -> Self {
+        Config {
+            V_EXC: Neuron::V_EXC,
+            V_INH: Neuron::V_INH,
+            TAU_INH: Neuron::TAU_INH,
+            TAU_SLOW: Neuron::TAU_SLOW,
+            TAU_EXC: Neuron::TAU_EXC,
+            TAU_EXC_SLOW: Neuron::TAU_EXC_SLOW,
+            TAU_STIM: Neuron::TAU_STIM,
+            TAU_SK: Neuron::TAU_SK,
+            STIM_TIME,
+            STIM_DURATION: Neuron::STIM_DURATION,
+            SK_MU: Neuron::SK_MU,
+            SK_STDEV: Neuron::SK_STDEV,
+            LN_ODOR_TAU_RISE: Neuron::LN_ODOR_TAU_RISE,
+            LN_MECH_TAU_RISE: Neuron::LN_MECH_TAU_RISE,
+            LN_S_PN: Neuron::LN_S_PN,
+            LN_S_PN_SLOW: Neuron::LN_S_PN_SLOW,
+            LN_S_INH: Neuron::LN_S_INH,
+            LN_S_SLOW: Neuron::LN_S_SLOW,
+            LN_S_STIM: Neuron::LN_S_STIM,
+            PN_ODOR_TAU_RISE: Neuron::PN_ODOR_TAU_RISE,
+            PN_MECH_TAU_RISE: Neuron::LN_MECH_TAU_RISE,
+            PN_S_PN: Neuron::PN_S_PN,
+            PN_S_PN_SLOW: Neuron::PN_S_PN_SLOW,
+            PN_S_INH: Neuron::PN_S_INH,
+            PN_S_SLOW: Neuron::PN_S_SLOW,
+            PN_S_STIM: Neuron::PN_S_STIM,
+            PN_PN_PROB: Network::PN_PN_PROBABILITY,
+            PN_LN_PROB: Network::PN_LN_PROBABILITY,
+            LN_PN_PROB: Network::LN_PN_PROBABILITY,
+            LN_LN_PROB: Network::LN_LN_PROBABILITY
+        }
     }
 }
 

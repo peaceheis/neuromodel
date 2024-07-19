@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 
 from model import Network, DELTA_T, Neuron
 
-duration = 500
+duration = 2000
 stim_time = 250
 BIN_SIZE = duration / 10
 assert(duration % BIN_SIZE == 0)

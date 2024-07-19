@@ -354,10 +354,10 @@ class Neuron:
 
 
 class Glomerulus:
-    PN_PN_PROBABILITY = 0.02
-    PN_LN_PROBABILITY = 0.05
-    LN_PN_PROBABILITY = 0.18
-    LN_LN_PROBABILITY = 0.08 # .25
+    PN_PN_PROBABILITY = 0.75
+    PN_LN_PROBABILITY = 0.75
+    LN_PN_PROBABILITY = 0.38
+    LN_LN_PROBABILITY = 0.25 # .25
     count = 0
 
     def __init__(self, stim_time: float, lambda_odor: float, lambda_mech: float, g_id: int):
