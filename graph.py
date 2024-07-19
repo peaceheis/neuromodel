@@ -21,6 +21,7 @@ class NeuronRep:
     slow_inhibition_vals: list[float]
     g_sk_vals: list[float]
     spike_times: list[float]
+    type: str
 
 class GlomerulusRep:
     def __init__(self, pns: list[NeuronRep], lns: list[NeuronRep]):
@@ -46,12 +47,12 @@ for i, neuron in enumerate(data["neurons"]):
 
     if i%16 < 10:
         neuron = NeuronRep(neuron["excitation_vals"], neuron["slow_excitation_vals"], neuron["inhibition_vals"],
-                      neuron["slow_inhibition_vals"], neuron["g_sk_vals"], neuron["spike_times"])
+                      neuron["slow_inhibition_vals"], neuron["g_sk_vals"], neuron["spike_times"], "PN")
         current_pns.append(neuron)
         all_neurons.append(neuron)
     else: # 10 < i%16
         neuron = NeuronRep(neuron["excitation_vals"], neuron["slow_excitation_vals"], neuron["inhibition_vals"],
-                      neuron["slow_inhibition_vals"], neuron["g_sk_vals"], neuron["spike_times"])
+                      neuron["slow_inhibition_vals"], neuron["g_sk_vals"], neuron["spike_times"], "LN")
         current_lns.append(neuron)
         all_neurons.append(neuron)
         if i%16 == 15:
@@ -61,10 +62,11 @@ for i, neuron in enumerate(data["neurons"]):
 
 
 # eventplot
-
+colors = ["blue" if neuron.type == "LN" else "red" for neuron in all_neurons]
 totaldata = [neuron.spike_times for neuron in all_neurons]
-plt.figure()
-plt.title("Total Glomerular Activity")
-plt.eventplot(totaldata, colors='blue')
-plt.savefig(f"{output_dir}/total")
+fig = plt.figure(figsize=(20, 10), dpi=300)
+ax = fig.add_subplot(1, 1, 1)
+fig.suptitle("Total Glomerular Activity")
+ax.eventplot(totaldata, colors=colors, linewidths=0.5, alpha=1)
+fig.savefig(f"{output_dir}/total")
 

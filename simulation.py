@@ -109,7 +109,7 @@ for i, glomerulus in enumerate(network.glomeruli):
     #     print(
     #         f"Glomerulus {i} - Neuron {neuron.n_id} Excitation {neuron.total_excitation}, len {len(neuron.inh_times)} SK {neuron.s_sk if neuron.neuron_type == 'PN' else 0}, inh {len(neuron.inh_times)}, exc {len(neuron.exc_times)}")
 
-plt.figure()
+plt.figure(figsize=(2, 2), dpi=600)
 plt.title("Total Glomerular Activity")
 plt.eventplot(totaldata, colors='blue')
 if should_serialize:
