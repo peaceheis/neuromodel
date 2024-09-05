@@ -10,7 +10,7 @@ use crate::model::{Config, Network, SerializedNetwork};
 
 pub mod model;
 
-const DURATION: i32 = 2000;
+const DURATION: i32 = 1500;
 const STIM_TIME: i32 = 250;
 const BIN_SIZE: i32 = DURATION / 10;
 
@@ -24,7 +24,7 @@ fn main() -> std::io::Result<()>{
 
     let data = fs::read_to_string("config.json").expect("Unable to read file");
     let prefs: serde_json::Value = serde_json::from_str(&*data).expect("JSON was not well-formatted");
-    let prefix: String = prefs["prefix"].to_string().replace('"', "");
+    let prefix = std::env::current_dir().unwrap().display().to_string() + "\\output";
     println!("PREFIX {}", prefix);
 
     let mut network: Network = model::Network::new(STIM_TIME, model::NetworkType::Additive, [0, 1, 2, 3, 4, 5]);
@@ -41,14 +41,15 @@ fn main() -> std::io::Result<()>{
     }
     println!("Simulated {} ms in {} seconds", DURATION, now.elapsed().as_secs());
     
-    let parent: String = format!("{}{}", prefix, chrono::offset::Local::now().format("%F %X"));
-    fs::create_dir_all(&parent)?;
+    let parent: String = format!("{}\\{}", prefix, chrono::offset::Local::now().format("%F %H-%M"));
+    println!("{}", parent);
+    fs::create_dir(&parent)?;
     
-    let mut buffer = File::create(format!("{}/result.json", prefix))?;
+    let mut buffer = File::create(format!("{}\\result.json", prefix))?;
     buffer.write_all(serde_json::to_string_pretty(&SerializedNetwork::from_network(network, parent.clone()))?.as_ref())?;
     println!("Saved result JSON");
     
-    buffer = File::create(format!("{}/config.json", parent))?;
+    buffer = File::create(format!("{}\\config.json", parent))?;
     buffer.write_all(serde_json::to_string_pretty(&Config::create())?.as_ref())?;
     println!("Saved config");
     
