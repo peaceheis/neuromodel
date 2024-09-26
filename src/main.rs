@@ -10,7 +10,7 @@ use crate::model::{Config, Network, SerializedNetwork, DELTA_T};
 
 pub mod model;
 
-const DURATION: usize = 1000;
+const DURATION: usize = 2000;
 const STIM_TIME: i32 = 500;
 const BIN_SIZE: usize = DURATION / 10;
 

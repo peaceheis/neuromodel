@@ -73,7 +73,7 @@ impl Neuron {
     const TAU_EXC: f64 = 2.0;
     const TAU_INH: f64 = 2.0;
     const TAU_SLOW: f64 = 750.0;
-    const TAU_EXC_SLOW: f64 = 700.0;
+    const TAU_EXC_SLOW: f64 = 850.0;
     const TAU_STIM: f64 = 2.0;
     const TAU_DECAY: f64 = 384.0; 
     const TAU_SK: f64 = 250.0;
@@ -277,7 +277,7 @@ impl Neuron {
                 1.0
             } else {
                 return E.powf(-(self.t - self.t_stim_off) / Neuron::TAU_DECAY);
-            }
+            } 
         } else {
             return if self.t <= self.t_stim_off {
                 Neuron::heaviside(self.t - self.t_stim_on) as f64
@@ -510,8 +510,12 @@ pub(crate) struct Network {
     t: f64,
 }
 
+
+
 impl Network {
-    const PN_PN_PROBABILITY: f64 = 0.50; // MODIFIED: originally 0.75
+    const NUM_PNS: usize = 4;
+    const NUM_LNS: usize = 12;
+    const PN_PN_PROBABILITY: f64 = 0.30; // MODIFIED: originally 0.75
     const PN_LN_PROBABILITY: f64 = 0.55;
     const LN_PN_PROBABILITY: f64 = 0.35;
     const LN_LN_PROBABILITY: f64 = 0.25; // .25
@@ -551,7 +555,7 @@ impl Network {
             };
 
             for j in 0..16 {
-                if (0 <= j) && (j < 10) {
+                if (0 <= j) && (j < Network::NUM_PNS) {
                     neurons_vec.push(Neuron::new(
                         stim_time as f64,
                         odor_val,
@@ -560,15 +564,16 @@ impl Network {
                         &mut rng,
                         duration,
                     ));
-                    let random_vals: DistIter<Standard, &mut SmallRng, f64> =
+                    let mut random_vals: DistIter<Standard, &mut SmallRng, f64> =
                         Standard.sample_iter(&mut rng);
                     // intraglomerular PN connections
-                    connectivity_matrix[(i * 16 + j) as usize] = random_vals
+                    let intermediate_val = random_vals
+                        .by_ref()
                         .take(16)
                         .enumerate()
                         .filter(|&(k, x)| {
                             (k != (j) as usize)
-                                && (if k < 10 {
+                                && (if k < Network::NUM_PNS {
                                     // neurons 0 to 9 are PNs...
                                     x < Network::PN_PN_PROBABILITY
                                 } else {
@@ -576,7 +581,15 @@ impl Network {
                                     x < Network::PN_LN_PROBABILITY
                                 })
                         })
-                        .map(|(k, _)| (i * 16) as usize + k)
+                        .collect::<Vec<(usize, f64)>>();
+                    
+                    connectivity_matrix[(i as usize * 16 + j) as usize] = intermediate_val
+                        .into_iter()
+                        .chain(random_vals.take(96).enumerate().filter(|&(k, x)| {
+                            (k != (i as usize * 16 + j) as usize)
+                                && ((k % 16 < Network::NUM_PNS) && (x < Network::LN_PN_PROBABILITY))
+                        }))
+                        .map(|(k, _)| k)
                         .collect::<Vec<usize>>();
                     
                     
@@ -598,7 +611,7 @@ impl Network {
                         .enumerate()
                         .filter(|&(k, x)| {
                             (k != (j) as usize)
-                                && (if k < 10 {
+                                && (if k < Network::NUM_PNS {
                                     x < Network::LN_PN_PROBABILITY
                                 } else {
                                     x < Network::LN_LN_PROBABILITY
@@ -606,11 +619,11 @@ impl Network {
                         })
                         .collect::<Vec<(usize, f64)>>();
 
-                    connectivity_matrix[(i * 16 + j) as usize] = intermediate_val
+                    connectivity_matrix[(i as usize * 16 + j) as usize] = intermediate_val
                         .into_iter()
                         .chain(random_vals.take(96).enumerate().filter(|&(k, x)| {
-                            (k != (i * 16 + j) as usize)
-                                && ((k % 16 < 10) && (x < Network::LN_PN_PROBABILITY))
+                            (k != (i as usize * 16 + j) as usize)
+                                && ((k % 16 < Network::NUM_PNS) && (x < Network::LN_PN_PROBABILITY))
                         }))
                         .map(|(k, _)| k)
                         .collect::<Vec<usize>>();

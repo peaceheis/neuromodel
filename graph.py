@@ -51,7 +51,7 @@ current_lns = []
 
 for i, neuron in enumerate(data["neurons"]):
 
-    if i%16 < 10:
+    if i%16 < 4:
         neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]), np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
                       np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]), np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]), np.array(neuron["spike_times"]), "PN")
         current_pns.append(neuron)
