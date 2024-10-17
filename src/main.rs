@@ -1,4 +1,3 @@
-use std::arch::aarch64::uint8x8_t;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -21,13 +20,14 @@ fn main() -> std::io::Result<()> {
 
     let now = Instant::now();
     let mut t: f64 = 0.0;
-
     let data = fs::read_to_string("config.json").expect("Unable to read file");
     let prefs: serde_json::Value =
         serde_json::from_str(&*data).expect("JSON was not well-formatted");
     let prefix: String = prefs["prefix"].to_string().replace('"', "");
-    let parent: String = format!("{}{}", prefix, chrono::offset::Local::now().format("%F %X"));
+    let parent: String = format!("{}{}", prefix, chrono::offset::Local::now().format("%F %H-%M-%S"));
+    println!("again");
     fs::create_dir_all(&parent)?;
+    println!("created dir");
     println!("PREFIX {}", prefix);
 
     let mut network: Network = model::Network::new(
