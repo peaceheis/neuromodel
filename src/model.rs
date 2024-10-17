@@ -343,34 +343,18 @@ impl Neuron {
     fn update(&mut self, rng: &RefCell<SmallRng>, t: f64) -> bool {
         if self.refractory_counter > 0f64 {
             self.refractory_counter -= DELTA_T;
-            self.voltages.push(self.v);
-            self.spike_counts.push(self.spike_times.len());
-            self.g_exc_vals.push(self.g_exc);
-            self.g_slow_vals.push(self.g_slow);
-            self.g_inh_vals.push(self.g_inh);
-            self.g_slow_exc_vals.push(self.g_exc_slow);
-            self.g_stim_vals.push(self.g_stim);
-            self.g_sk_vals.push(self.g_sk);
-            self.dv_dt_vals.push(self.dv_dt);
-            self.count += 1;
         } else {
             self.v = self.v + self.dv_dt * DELTA_T;
-            self.voltages.push(self.v);
 
             if self.v >= Neuron::V_THRES {
+                self.spike_times.push(self.t);
                 self.v = Neuron::V_L;
                 self.refractory_counter = Neuron::TAU_REFRACTORY;
-                self.spike_times.push(self.t);
-                self.spike_counts.push(self.spike_times.len());
-                self.g_exc_vals.push(self.g_exc);
-                self.g_slow_vals.push(self.g_slow);
-                self.g_inh_vals.push(self.g_inh);
-                self.g_slow_exc_vals.push(self.g_exc_slow);
-                self.g_stim_vals.push(self.g_stim);
-                self.g_sk_vals.push(self.g_sk);
-                self.dv_dt_vals.push(self.dv_dt);
-                self.count += 1;
                 self.t += DELTA_T;
+                if self.count % 10 == 0 {
+                    self.record_values();
+                }
+                self.count += 1;
                 return true;
             }
 
@@ -405,15 +389,6 @@ impl Neuron {
                     - (self.g_exc_slow * (self.v - Neuron::V_EXC))
                     - (self.g_stim * (self.v - Neuron::V_STIM))
             };
-            self.spike_counts.push(self.spike_times.len());
-            self.g_exc_vals.push(self.g_exc);
-            self.g_slow_vals.push(self.g_slow);
-            self.g_inh_vals.push(self.g_inh);
-            self.g_slow_exc_vals.push(self.g_exc_slow);
-            self.g_stim_vals.push(self.g_stim);
-            self.g_sk_vals.push(self.g_sk);
-            self.dv_dt_vals.push(self.dv_dt);
-            self.count += 1;
         }
         if t as i32 % (Neuron::TAU_STIM * 3.0) as i32 == 0 {
             self.stim_times = self
@@ -447,8 +422,25 @@ impl Neuron {
                 .map(|x| *x)
                 .collect();
         }
+        
+        if self.count % 10 == 0 {
+            self.record_values()
+        }
+        self.count += 1;
         self.t += DELTA_T;
         false
+    }
+
+    fn record_values(&mut self) {
+        self.voltages.push(self.v);
+        self.spike_counts.push(self.spike_times.len());
+        self.g_exc_vals.push(self.g_exc);
+        self.g_slow_vals.push(self.g_slow);
+        self.g_inh_vals.push(self.g_inh);
+        self.g_slow_exc_vals.push(self.g_exc_slow);
+        self.g_stim_vals.push(self.g_stim);
+        self.g_sk_vals.push(self.g_sk);
+        self.dv_dt_vals.push(self.dv_dt);
     }
 
     fn generate_firing_rates(self, duration: i8, bin_size: i8) -> Vec<f64> {

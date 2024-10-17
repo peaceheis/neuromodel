@@ -10,12 +10,13 @@ use crate::model::{Config, Network, SerializedNetwork, DELTA_T};
 
 pub mod model;
 
-const DURATION: usize = 2000;
+const DURATION: usize = 1000;
 const STIM_TIME: i32 = 500;
 const BIN_SIZE: usize = DURATION / 10;
 
 fn main() -> std::io::Result<()> {
     assert_eq!(DURATION % BIN_SIZE, 0);
+    
     const STEPS: i32 = (DURATION as f64 / model::DELTA_T) as i32;
 
     let now = Instant::now();
@@ -25,6 +26,8 @@ fn main() -> std::io::Result<()> {
     let prefs: serde_json::Value =
         serde_json::from_str(&*data).expect("JSON was not well-formatted");
     let prefix: String = prefs["prefix"].to_string().replace('"', "");
+    let parent: String = format!("{}{}", prefix, chrono::offset::Local::now().format("%F %X"));
+    fs::create_dir_all(&parent)?;
     println!("PREFIX {}", prefix);
 
     let mut network: Network = model::Network::new(
@@ -50,9 +53,6 @@ fn main() -> std::io::Result<()> {
         DURATION,
         now.elapsed().as_secs()
     );
-
-    let parent: String = format!("{}{}", prefix, chrono::offset::Local::now().format("%F %X"));
-    fs::create_dir_all(&parent)?;
 
     let mut buffer = File::create(format!("{}/result.json", prefix))?;
     buffer.write_all(

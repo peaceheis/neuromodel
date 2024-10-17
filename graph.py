@@ -82,7 +82,7 @@ for i, glomerulus in enumerate(glomeruli):
     plt.eventplot(totaldata, colors=colors, linewidths=0.5, alpha=1)
     plt.savefig(f"{output_dir}/glomerulus_{i}")
 
-x_vals = np.linspace(0, duration, num=int(duration/delta_t))
+x_vals = np.linspace(0, duration, num=int(duration/(delta_t*10)))
 plt.figure()
 neuron_num = 17
 neuron_1 = all_neurons[neuron_num]
@@ -106,5 +106,5 @@ plt.plot(x_vals, additive - subtractive, label="total", alpha=0.5)
 plt.legend()
 plt.savefig(f"{output_dir}/neuron_{neuron_num}_values")
 plt.figure()
-plt.hist(neuron_1.spike_times, bins=[i for i in range(0, int(duration)+500, 500)])
+plt.hist(neuron_1.spike_times, bins=[i for i in range(0, int(duration)+100, 100)])
 plt.savefig(f"{output_dir}/hist_{neuron_num}")
