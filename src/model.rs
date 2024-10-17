@@ -422,7 +422,7 @@ impl Neuron {
                 .map(|x| *x)
                 .collect();
         }
-        
+
         if self.count % 10 == 0 {
             self.record_values()
         }
@@ -511,13 +511,14 @@ impl Network {
     const PN_LN_PROBABILITY: f64 = 0.55;
     const LN_PN_PROBABILITY: f64 = 0.35;
     const LN_LN_PROBABILITY: f64 = 0.25; // .25
+    const SEED: u64 = 42576381;
     pub(crate) fn new(
         stim_time: i32,
         network_type: NetworkType,
         affected_glomeruli: [i8; 6],
         duration: usize,
     ) -> Self {
-        let rng_struct: RefCell<SmallRng> = RefCell::new(SmallRng::from_thread_rng());
+        let rng_struct: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(Network::SEED));
 
         let mut neurons_vec: Vec<Neuron> = Vec::new();
         const DUMMY_VEC: Vec<usize> = Vec::new();
