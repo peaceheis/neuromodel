@@ -1,4 +1,5 @@
 import json
+import random
 from dataclasses import dataclass
 
 import matplotlib.pyplot as plt
@@ -13,6 +14,7 @@ output_dir = data["dir"]
 stim_time = data["stim_time"]
 duration = data["duration"]
 delta_t = data["delta_t"]
+matrix = data["connectivity_matrix"]
 
 @dataclass
 class NeuronRep:
@@ -84,9 +86,9 @@ for i, glomerulus in enumerate(glomeruli):
 
 x_vals = np.linspace(0, duration, num=int(duration/(delta_t*10)))
 plt.figure()
-neuron_num = 17
+neuron_num = 0
 neuron_1 = all_neurons[neuron_num]
-x = "PN" if neuron_num%16<10 else "LN"
+x = "PN" if neuron_num%16<6 else "LN"
 print(f"this is a {x}")
 
 # plt.plot(x_vals, neuron_1.voltages, label="voltage")
@@ -100,11 +102,24 @@ additive = neuron_1.excitation_vals + neuron_1.slow_excitation_vals + neuron_1.s
 # plt.plot(x_vals, neuron_1.stim_vals, label="stim", alpha=0.5)
 # plt.plot(x_vals, neuron_1.g_sk_vals, label="sk", alpha=0.4)
 plt.plot(x_vals, additive, label="add", alpha=0.75)
-plt.plot(x_vals, subtractive, label="sub", alpha=0.75)
+plt.plot(x_vals, subtractive, label="sub", alpha=0.3)
 plt.plot(x_vals, additive - subtractive, label="total", alpha=0.5)
+
+
 
 plt.legend()
 plt.savefig(f"{output_dir}/neuron_{neuron_num}_values")
+
+for i in range(6):
+    plt.figure()
+    index = random.randint(0, 6)
+    plt.hist(glomeruli[i].neurons[index].spike_times, bins=[i for i in range(0, int(duration)+100, 100)])
+    plt.savefig(f"{output_dir}/hist_{i*16+index}")
+
+
+# connectivity matrix
+
 plt.figure()
-plt.hist(neuron_1.spike_times, bins=[i for i in range(0, int(duration)+100, 100)])
-plt.savefig(f"{output_dir}/hist_{neuron_num}")
+colors = ["blue" if neuron.type == "LN" else "red" for neuron in all_neurons]
+plt.eventplot([[connection for connection in row] for row in matrix], colors=colors)
+plt.savefig(f"{output_dir}/matrix")

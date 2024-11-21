@@ -1,6 +1,9 @@
 use std::cell::{RefCell, RefMut};
 use std::cmp::PartialEq;
 use std::f64::consts::E;
+use ndarray::Array;
+use ndarray_rand::RandomExt;
+use ndarray_rand::rand_distr::Uniform;
 
 use rand::distributions::{DistIter, Standard};
 use rand::Rng;
@@ -72,13 +75,13 @@ impl Neuron {
     const TAU_V: f64 = 20.0; // leakage timescale
     const TAU_EXC: f64 = 2.0;
     const TAU_INH: f64 = 2.0;
-    const TAU_SLOW: f64 = 750.0;
-    const TAU_EXC_SLOW: f64 = 850.0;
+    const TAU_SLOW: f64 = 250.0;
+    const TAU_EXC_SLOW: f64 = 400.0;
     const TAU_STIM: f64 = 2.0;
     const TAU_DECAY: f64 = 384.0; 
     const TAU_SK: f64 = 250.0;
     const TAU_HALF_RISE_SK: f64 = 25.0;
-    const TAU_HALF_RISE_EXC: f64 = 70.0;
+    const TAU_HALF_RISE_EXC: f64 = 25.0;
     const STIMULUS_TAU_DECAY: f64 = 2.0;
     const TAU_REFRACTORY: f64 = 2.0;
     const BG_SPIKES_PER_MS: f64 = 3.6;
@@ -91,7 +94,7 @@ impl Neuron {
     const SK_STDEV: f64 = 0.2;
     const LN_ODOR_TAU_RISE: f64 = 0.0;
     const LN_MECH_TAU_RISE: f64 = 150.0;
-    const LN_S_PN: f64 = 0.006;
+    const LN_S_PN: f64 = 0.006*8.0;
     const LN_S_PN_SLOW: f64 = 0.0;
     const LN_S_INH: f64 = 0.015;
     const LN_S_SLOW: f64 = 0.04;
@@ -99,10 +102,10 @@ impl Neuron {
     const PN_ODOR_TAU_RISE: f64 = 35.0;
     const PN_MECH_TAU_RISE: f64 = 0.0;
     const PN_S_PN: f64 = 0.01;
-    const PN_S_PN_SLOW: f64 = 0.02;
+    const PN_S_PN_SLOW: f64 = 0.02*3.0;
     const PN_S_INH: f64 = 0.0169;
-    const PN_S_SLOW: f64 = 0.0338;
-    const PN_S_STIM: f64 = 0.004;
+    const PN_S_SLOW: f64 = 0.0338*1.5;
+    const PN_S_STIM: f64 = 0.004 ;
 
     fn new(
         t_stim_on: f64,
@@ -351,15 +354,17 @@ impl Neuron {
                 self.v = Neuron::V_L;
                 self.refractory_counter = Neuron::TAU_REFRACTORY;
                 self.t += DELTA_T;
+
                 if self.count % 10 == 0 {
                     self.record_values();
                 }
+
                 self.count += 1;
                 return true;
             }
 
             //poisson model
-            let lamb_ = self.incoming_spikes_per_ms() * 0.1;
+            let lamb_ = self.incoming_spikes_per_ms() * DELTA_T;
             self.lambda_vals.push(lamb_);
             let int_val: usize = lamb_.trunc() as usize;
             self.stim_times.extend((0..int_val).map(|_| t));
@@ -424,8 +429,9 @@ impl Neuron {
         }
 
         if self.count % 10 == 0 {
-            self.record_values()
+            self.record_values();
         }
+
         self.count += 1;
         self.t += DELTA_T;
         false
@@ -507,11 +513,15 @@ pub(crate) struct Network {
 impl Network {
     const NUM_PNS: usize = 4;
     const NUM_LNS: usize = 12;
-    const PN_PN_PROBABILITY: f64 = 0.30; // MODIFIED: originally 0.75
-    const PN_LN_PROBABILITY: f64 = 0.55;
+    const PN_PN_PROBABILITY: f64 = 0.4; // MODIFIED: originally 0.75
+    const PN_LN_PROBABILITY: f64 = 0.3;
     const LN_PN_PROBABILITY: f64 = 0.35;
     const LN_LN_PROBABILITY: f64 = 0.25; // .25
-    const SEED: u64 = 42576381;
+    const CROSS_PN_PN_PROBABILITY: f64 = 0.2;
+    const CROSS_PN_LN_PROBABILITY: f64 = 0.15;
+    const CROSS_LN_PN_PROBABILITY: f64 = 0.15;
+    const CROSS_LN_LN_PROBABILITY: f64 = 0.1;
+    const SEED: u64 = 13478293478;
     pub(crate) fn new(
         stim_time: i32,
         network_type: NetworkType,
@@ -524,31 +534,31 @@ impl Network {
         const DUMMY_VEC: Vec<usize> = Vec::new();
         let mut connectivity_matrix: [Vec<usize>; 96] = [DUMMY_VEC; 96];
 
-        for i in 0..6 {
+        for glom_index in 0..6 {
             let mut rng: RefMut<SmallRng> = rng_struct.borrow_mut();
 
             // assign stimulus amounts based on network type and "glomerulus"
             let (odor_val, mech_val) = match network_type {
                 NetworkType::Odor => (
                     Neuron::LAMBDA_ODOR_MAX
-                        * affected_glomeruli.iter().filter(|&x| *x == i).count() as f64,
+                        * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
                     0.0,
                 ),
                 NetworkType::Mech => (0.0, Neuron::LAMBDA_MECH_MAX),
                 NetworkType::Additive => (
                     Neuron::LAMBDA_ODOR_MAX
-                        * affected_glomeruli.iter().filter(|&x| *x == i).count() as f64,
+                        * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
                     Neuron::LAMBDA_MECH_MAX,
                 ),
                 NetworkType::Normalized => (
                     Neuron::HALF_LAMBDA_ODOR_MAX
-                        * affected_glomeruli.iter().filter(|&x| *x == i).count() as f64,
+                        * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
                     Neuron::HALF_LAMBDA_MECH_MAX,
                 ),
             };
 
-            for j in 0..16 {
-                if (0 <= j) && (j < Network::NUM_PNS) {
+            for neuron_index in 0..16 {
+                if (neuron_index < Network::NUM_PNS) {
                     neurons_vec.push(Neuron::new(
                         stim_time as f64,
                         odor_val,
@@ -557,36 +567,9 @@ impl Network {
                         &mut rng,
                         duration,
                     ));
-                    let mut random_vals: DistIter<Standard, &mut SmallRng, f64> =
-                        Standard.sample_iter(&mut rng);
-                    // intraglomerular PN connections
-                    let intermediate_val = random_vals
-                        .by_ref()
-                        .take(16)
-                        .enumerate()
-                        .filter(|&(k, x)| {
-                            (k != (j) as usize)
-                                && (if k < Network::NUM_PNS {
-                                    // neurons 0 to 9 are PNs...
-                                    x < Network::PN_PN_PROBABILITY
-                                } else {
-                                    // ... and neurons 10 to 15 are LNs.
-                                    x < Network::PN_LN_PROBABILITY
-                                })
-                        })
-                        .collect::<Vec<(usize, f64)>>();
-                    
-                    connectivity_matrix[(i as usize * 16 + j) as usize] = intermediate_val
-                        .into_iter()
-                        .chain(random_vals.take(96).enumerate().filter(|&(k, x)| {
-                            (k != (i as usize * 16 + j) as usize)
-                                && ((k % 16 < Network::NUM_PNS) && (x < Network::LN_PN_PROBABILITY))
-                        }))
-                        .map(|(k, _)| k)
-                        .collect::<Vec<usize>>();
-                    
-                    
-                } else {
+
+                }
+                else {
                     neurons_vec.push(Neuron::new(
                         stim_time as f64,
                         odor_val,
@@ -595,31 +578,40 @@ impl Network {
                         &mut rng,
                         duration,
                     ));
-                    let mut random_vals: DistIter<Standard, &mut SmallRng, f64> =
-                        Standard.sample_iter(&mut rng);
-                    // intraglomerular LN connections
-                    let intermediate_val = random_vals
-                        .by_ref()
-                        .take(16)
-                        .enumerate()
-                        .filter(|&(k, x)| {
-                            (k != (j) as usize)
-                                && (if k < Network::NUM_PNS {
-                                    x < Network::LN_PN_PROBABILITY
-                                } else {
-                                    x < Network::LN_LN_PROBABILITY
-                                })
-                        })
-                        .collect::<Vec<(usize, f64)>>();
+                }
+            }
+        }
 
-                    connectivity_matrix[(i as usize * 16 + j) as usize] = intermediate_val
-                        .into_iter()
-                        .chain(random_vals.take(96).enumerate().filter(|&(k, x)| {
-                            (k != (i as usize * 16 + j) as usize)
-                                && ((k % 16 < Network::NUM_PNS) && (x < Network::LN_PN_PROBABILITY))
-                        }))
-                        .map(|(k, _)| k)
-                        .collect::<Vec<usize>>();
+        // build out connectivity matrix.
+
+        // first, generate a 96 x 96 matrix of float values...
+        let (rand_vals, _) = Array::random((96, 96), Uniform::new(0.0, 1.0)).into_raw_vec_and_offset();
+        // repackage values into slightly nicer form
+        const DUMMY_ARR: [f64; 96] = [0.0; 96];
+        let mut vals: [[f64; 96]; 96] = [DUMMY_ARR; 96];
+        for i in 0..96 {
+            for j in 0..96 {
+                vals[i][j] = rand_vals[i*96 + j];
+            }
+        }
+        // now the magic.
+        for (neuron_index, row) in vals.iter().enumerate() {
+            let neuron_glomerular_index = neuron_index / 16;
+            let neuron_relative_index = neuron_index % 16;
+            let neuron_is_pn = neuron_relative_index < Network::NUM_PNS;
+            for (target_index, &rand_val) in row.iter().enumerate() {
+                let target_glomerular_index = target_index / 16;
+                let target_relative_index = target_index % 16;
+                let target_is_pn = target_relative_index < Network::NUM_PNS;
+                let is_intra_glomerular = neuron_glomerular_index == target_glomerular_index;
+                let probability = match (neuron_is_pn, target_is_pn) {
+                    (true, true) => if is_intra_glomerular {Network::PN_PN_PROBABILITY} else {Network::CROSS_PN_PN_PROBABILITY},
+                    (true, false) => if is_intra_glomerular {Network::PN_LN_PROBABILITY} else {Network::CROSS_PN_LN_PROBABILITY}
+                    (false, true) => if is_intra_glomerular {Network::LN_PN_PROBABILITY} else {Network::CROSS_LN_PN_PROBABILITY},
+                    (false, false) => if is_intra_glomerular {Network::LN_LN_PROBABILITY} else {Network::CROSS_LN_LN_PROBABILITY}
+                };
+                if rand_val <= probability {
+                    connectivity_matrix[neuron_index].push(target_index);
                 }
             }
         }
@@ -668,6 +660,7 @@ impl Network {
 pub struct SerializedNetwork {
     dir: String,
     neurons: Vec<SerializedNeuron>,
+    connectivity_matrix: Vec<Vec<usize>>,
     stim_time: i32,
     duration: usize,
     delta_t: f64,
@@ -683,6 +676,7 @@ impl SerializedNetwork {
         SerializedNetwork {
             dir,
             neurons: serialized_neurons,
+            connectivity_matrix: network.connectivity_matrix.to_vec(),
             stim_time: STIM_TIME,
             duration: DURATION,
             delta_t: DELTA_T,
@@ -723,6 +717,10 @@ pub struct Config {
     PN_LN_PROB: f64,
     LN_PN_PROB: f64,
     LN_LN_PROB: f64,
+    CROSS_PN_PN_PROB: f64,
+    CROSS_PN_LN_PROB: f64,
+    CROSS_LN_PN_PROB: f64,
+    CROSS_LN_LN_PROB: f64,
 }
 
 impl Config {
@@ -760,6 +758,10 @@ impl Config {
             PN_LN_PROB: Network::PN_LN_PROBABILITY,
             LN_PN_PROB: Network::LN_PN_PROBABILITY,
             LN_LN_PROB: Network::LN_LN_PROBABILITY,
+            CROSS_PN_PN_PROB: Network::CROSS_PN_PN_PROBABILITY,
+            CROSS_PN_LN_PROB: Network::CROSS_PN_LN_PROBABILITY,
+            CROSS_LN_PN_PROB: Network::CROSS_LN_PN_PROBABILITY,
+            CROSS_LN_LN_PROB: Network::CROSS_LN_LN_PROBABILITY,
         }
     }
 }
