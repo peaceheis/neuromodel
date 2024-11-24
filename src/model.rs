@@ -102,7 +102,7 @@ impl Neuron {
     const PN_ODOR_TAU_RISE: f64 = 35.0;
     const PN_MECH_TAU_RISE: f64 = 300.0;
     const PN_S_PN: f64 = 0.01;
-    const PN_S_PN_SLOW: f64 = 0.02*1.75;
+    const PN_S_PN_SLOW: f64 = 0.02;
     const PN_S_INH: f64 = 0.0169;
     const PN_S_SLOW: f64 = 0.0338;
     const PN_S_STIM: f64 = 0.004 ;
@@ -663,6 +663,8 @@ impl Network {
 
 #[derive(Debug, Serialize)]
 pub struct SerializedNetwork {
+    num_pns: usize,
+    num_lns: usize,
     dir: String,
     neurons: Vec<SerializedNeuron>,
     connectivity_matrix: Vec<Vec<usize>>,
@@ -681,6 +683,8 @@ impl SerializedNetwork {
             .collect();
         SerializedNetwork {
             dir,
+            num_pns: Network::NUM_PNS,
+            num_lns: Network::NUM_LNS,
             neurons: serialized_neurons,
             connectivity_matrix: network.connectivity_matrix.to_vec(),
             stim_time: STIM_TIME,

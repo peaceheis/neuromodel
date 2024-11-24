@@ -10,7 +10,8 @@ prefix = json.load(open("config.json"))["prefix"]
 data = json.load(open(f"{prefix}result.json"))
 
 output_dir = data["dir"]
-
+NUM_PNS = data["num_pns"]
+NUM_LNS = data["num_lns"]
 stim_time = data["stim_time"]
 duration = data["duration"]
 delta_t = data["delta_t"]
@@ -55,7 +56,7 @@ current_lns = []
 
 for i, neuron in enumerate(data["neurons"]):
 
-    if i%16 < 4:
+    if i%16 < NUM_PNS:
         neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]), np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
                       np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]), np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]), np.array(neuron["spike_times"]),
                            np.array(neuron["spike_counts"]), "PN")
@@ -89,9 +90,9 @@ for i, glomerulus in enumerate(glomeruli):
 
 x_vals = np.linspace(0, duration, num=int(duration/(delta_t*(10-9*(not skipped_vals)))))
 plt.figure()
-neuron_num = 18
+neuron_num = 36
 neuron_1 = all_neurons[neuron_num]
-x = "PN" if neuron_num%16<6 else "LN"
+x = "PN" if neuron_num%16<NUM_PNS else "LN"
 print(f"this is a {x}")
 
 
@@ -99,10 +100,10 @@ print(f"this is a {x}")
 # plt.plot(x_vals, neuron_1.dv_dt_vals, label="dv dt")
 subtractive = neuron_1.inhibition_vals + neuron_1.slow_inhibition_vals
 additive = neuron_1.excitation_vals + neuron_1.slow_excitation_vals + neuron_1.stim_vals
-plt.plot(x_vals, neuron_1.slow_inhibition_vals, label="slow", alpha=0.7)
-plt.plot(x_vals, neuron_1.slow_excitation_vals, label="slow exc", alpha=0.6)
+# plt.plot(x_vals, neuron_1.slow_inhibition_vals, label="slow", alpha=0.7)
+# plt.plot(x_vals, neuron_1.slow_excitation_vals, label="slow exc", alpha=0.6)
 # plt.plot(x_vals, neuron_1.inhibition_vals, label="inh", alpha=0.5)
-plt.plot(x_vals, neuron_1.excitation_vals, label="exc", alpha=0.5)
+# plt.plot(x_vals, neuron_1.excitation_vals, label="exc", alpha=0.5)
 # plt.plot(x_vals, neuron_1.stim_vals, label="stim", alpha=0.5)
 # plt.plot(x_vals, neuron_1.g_sk_vals, label="sk", alpha=0.4)
 plt.plot(x_vals, additive, label="add", alpha=0.75)
@@ -116,26 +117,48 @@ plt.savefig(f"{output_dir}/neuron_{neuron_num}_values")
 
 for i in range(6):
     plt.figure()
-    index = random.randint(0, 6)
+    pn_index = random.randint(0, NUM_PNS - 1)
 
-    plt.plot((glomeruli[i].neurons[index].spike_counts[300:] - glomeruli[i].neurons[index].spike_counts[:-300])/300)
-    plt.title(f"Neuron {i * 16 + index} ({glomeruli[i].neurons[index].type}) Firing Rate")
-    plt.savefig(f"{output_dir}/hist_{i*16+index}")
+    plt.plot((glomeruli[i].neurons[pn_index].spike_counts[300:] - glomeruli[i].neurons[pn_index].spike_counts[:-300])/300)
+    plt.title(f"Neuron {i * 16 + pn_index} ({glomeruli[i].neurons[pn_index].type}) Firing Rate")
+    plt.savefig(f"{output_dir}/hist_pn_{i*16+pn_index}")
+    plt.close()
+
+    plt.figure()
+    ln_index = random.randint(NUM_PNS, 15)
+
+    plt.plot((glomeruli[i].neurons[ln_index].spike_counts[300:] - glomeruli[i].neurons[ln_index].spike_counts[:-300]) / 300)
+    plt.title(f"Neuron {i * 16 + ln_index} ({glomeruli[i].neurons[ln_index].type}) Firing Rate")
+    plt.savefig(f"{output_dir}/hist_ln_{i * 16 + ln_index}")
     plt.close()
 
     plt.figure()
     nrns = glomeruli[i].neurons
-    nrn_sum = nrns[5].spike_counts
+    nrn_sum = nrns[NUM_PNS].spike_counts
 
-    for j in range(5):
+    for j in range(NUM_PNS):
         nrn_sum += nrns[j].spike_counts
     print(i)
-    nrn_sum = nrn_sum * 1000 / 6.0
+    nrn_sum = nrn_sum * 1000 / NUM_PNS
     plt.plot(x_vals[300:], (nrn_sum[300:] - nrn_sum[:-300]) / 300)
     plt.title(f"Glomerulus {i} Continuous PN Firing Rate")
     plt.ylabel("Firing Rate, Hz")
-    plt.savefig(f"{output_dir}/glom_{i}_firing_rate")
+    plt.savefig(f"{output_dir}/glom_{i}_pn_firing_rate")
     plt.close()
+
+    plt.figure()
+    nrn_sum = nrns[15].spike_counts
+
+    for j in range(NUM_PNS, 15):
+        nrn_sum += nrns[j].spike_counts
+    nrn_sum = nrn_sum * 1000 / NUM_LNS
+    plt.plot(x_vals[300:], (nrn_sum[300:] - nrn_sum[:-300]) / 300)
+    plt.title(f"Glomerulus {i} Continuous LN Firing Rate")
+    plt.ylabel("Firing Rate, Hz")
+    plt.savefig(f"{output_dir}/glom_{i}_ln_firing_rate")
+    plt.close()
+
+
 
 # connectivity matrix
 
