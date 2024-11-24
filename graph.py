@@ -16,7 +16,9 @@ stim_time = data["stim_time"]
 duration = data["duration"]
 delta_t = data["delta_t"]
 matrix = data["connectivity_matrix"]
-skipped_vals: bool = data["skipped_vals"] # keeps track of whether only every 10th value was recorded for neuron data or not
+skipped_vals: bool = data[
+    "skipped_vals"]  # keeps track of whether only every 10th value was recorded for neuron data or not
+
 
 @dataclass
 class NeuronRep:
@@ -31,6 +33,7 @@ class NeuronRep:
     spike_times: np.array
     spike_counts: np.array
     type: str
+
 
 class GlomerulusRep:
     def __init__(self, pns: list[NeuronRep], lns: list[NeuronRep]):
@@ -47,8 +50,6 @@ class GlomerulusRep:
             self.neurons.extend(self.lns)
 
 
-
-
 glomeruli = []
 all_neurons = []
 current_pns = []
@@ -56,22 +57,27 @@ current_lns = []
 
 for i, neuron in enumerate(data["neurons"]):
 
-    if i%16 < NUM_PNS:
-        neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]), np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
-                      np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]), np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]), np.array(neuron["spike_times"]),
+    if i % 16 < NUM_PNS:
+        neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]),
+                           np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
+                           np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]),
+                           np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]),
+                           np.array(neuron["spike_times"]),
                            np.array(neuron["spike_counts"]), "PN")
         current_pns.append(neuron)
         all_neurons.append(neuron)
-    else: # 10 < i%16
-        neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]), np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
-                      np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]), np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]), np.array(neuron["spike_times"]), np.array(neuron["spike_counts"]),  "LN")
+    else:  # 10 < i%16
+        neuron = NeuronRep(np.array(neuron["voltages"]), np.array(neuron["excitation_vals"]),
+                           np.array(neuron["slow_excitation_vals"]), np.array(neuron["inhibition_vals"]),
+                           np.array(neuron["slow_inhibition_vals"]), np.array(neuron["g_sk_vals"]),
+                           np.array(neuron["stim_vals"]), np.array(neuron["dv_dt_vals"]),
+                           np.array(neuron["spike_times"]), np.array(neuron["spike_counts"]), "LN")
         current_lns.append(neuron)
         all_neurons.append(neuron)
-        if i%16 == 15:
+        if i % 16 == 15:
             glomeruli.append(GlomerulusRep(current_pns, current_lns))
             current_pns = []
             current_lns = []
-
 
 # eventplot
 colors = ["blue" if neuron.type == "LN" else "red" for neuron in all_neurons]
@@ -88,49 +94,54 @@ for i, glomerulus in enumerate(glomeruli):
     plt.eventplot(totaldata, colors=colors, linewidths=0.5, alpha=1)
     plt.savefig(f"{output_dir}/glomerulus_{i}")
 
-x_vals = np.linspace(0, duration, num=int(duration/(delta_t*(10-9*(not skipped_vals)))))
-plt.figure()
+x_vals = np.linspace(0, duration, num=int(duration / (delta_t * (10 - 9 * (not skipped_vals)))))
+
+
+def generate_vals_graph(nrn, n_index):
+    global x_vals
+    plt.figure()
+    # plt.plot(x_vals, neuron.voltages, label="voltage")
+    # plt.plot(x_vals, neuron.dv_dt_vals, label="dv dt")
+    subtractive = nrn.inhibition_vals + nrn.slow_inhibition_vals
+    additive = nrn.excitation_vals + nrn.slow_excitation_vals + nrn.stim_vals
+    # plt.plot(x_vals, neuron.slow_inhibition_vals, label="slow", alpha=0.7)
+    # plt.plot(x_vals, neuron.slow_excitation_vals, label="slow exc", alpha=0.6)
+    # plt.plot(x_vals, neuron.inhibition_vals, label="inh", alpha=0.5)
+    # plt.plot(x_vals, neuron.excitation_vals, label="exc", alpha=0.5)
+    # plt.plot(x_vals, neuron.stim_vals, label="stim", alpha=0.5)
+    # plt.plot(x_vals, neuron.g_sk_vals, label="sk", alpha=0.4)
+    plt.plot(x_vals, additive, label="add", alpha=0.75)
+    plt.plot(x_vals, subtractive, label="sub", alpha=0.3)
+    plt.plot(x_vals, additive - subtractive, label="total", alpha=0.5)
+    plt.legend()
+    plt.savefig(f"{output_dir}/neuron_{n_index}_{nrn.type}_values")
+    plt.close()
+
+
 neuron_num = 36
 neuron_1 = all_neurons[neuron_num]
-x = "PN" if neuron_num%16<NUM_PNS else "LN"
-print(f"this is a {x}")
+print(f"this is a {neuron_1.type}")
+generate_vals_graph(neuron_1, neuron_num)
 
 
-# plt.plot(x_vals, neuron_1.voltages, label="voltage")
-# plt.plot(x_vals, neuron_1.dv_dt_vals, label="dv dt")
-subtractive = neuron_1.inhibition_vals + neuron_1.slow_inhibition_vals
-additive = neuron_1.excitation_vals + neuron_1.slow_excitation_vals + neuron_1.stim_vals
-# plt.plot(x_vals, neuron_1.slow_inhibition_vals, label="slow", alpha=0.7)
-# plt.plot(x_vals, neuron_1.slow_excitation_vals, label="slow exc", alpha=0.6)
-# plt.plot(x_vals, neuron_1.inhibition_vals, label="inh", alpha=0.5)
-# plt.plot(x_vals, neuron_1.excitation_vals, label="exc", alpha=0.5)
-# plt.plot(x_vals, neuron_1.stim_vals, label="stim", alpha=0.5)
-# plt.plot(x_vals, neuron_1.g_sk_vals, label="sk", alpha=0.4)
-plt.plot(x_vals, additive, label="add", alpha=0.75)
-plt.plot(x_vals, subtractive, label="sub", alpha=0.3)
-plt.plot(x_vals, additive - subtractive, label="total", alpha=0.5)
+def generate_firing_rate_graph(nrn, n_index):
+    plt.figure()
+    plt.plot((nrn.spike_counts[300:] - nrn.spike_counts[:-300])*1000 / 300)
+    plt.title(f"Neuron {i * 16 + n_index} ({nrn.type}) Firing Rate")
+    plt.savefig(f"{output_dir}/hist_{nrn.type}_{i * 16 + n_index}")
+    plt.close()
 
-
-
-plt.legend()
-plt.savefig(f"{output_dir}/neuron_{neuron_num}_values")
 
 for i in range(6):
-    plt.figure()
     pn_index = random.randint(0, NUM_PNS - 1)
+    pn = glomeruli[i].neurons[pn_index]
+    generate_firing_rate_graph(pn, pn_index)
+    generate_vals_graph(pn, i*16+pn_index)
 
-    plt.plot((glomeruli[i].neurons[pn_index].spike_counts[300:] - glomeruli[i].neurons[pn_index].spike_counts[:-300])/300)
-    plt.title(f"Neuron {i * 16 + pn_index} ({glomeruli[i].neurons[pn_index].type}) Firing Rate")
-    plt.savefig(f"{output_dir}/hist_pn_{i*16+pn_index}")
-    plt.close()
-
-    plt.figure()
     ln_index = random.randint(NUM_PNS, 15)
-
-    plt.plot((glomeruli[i].neurons[ln_index].spike_counts[300:] - glomeruli[i].neurons[ln_index].spike_counts[:-300]) / 300)
-    plt.title(f"Neuron {i * 16 + ln_index} ({glomeruli[i].neurons[ln_index].type}) Firing Rate")
-    plt.savefig(f"{output_dir}/hist_ln_{i * 16 + ln_index}")
-    plt.close()
+    ln = glomeruli[i].neurons[ln_index]
+    generate_firing_rate_graph(ln, ln_index)
+    generate_vals_graph(ln, i*16+ln_index)
 
     plt.figure()
     nrns = glomeruli[i].neurons
@@ -157,8 +168,6 @@ for i in range(6):
     plt.ylabel("Firing Rate, Hz")
     plt.savefig(f"{output_dir}/glom_{i}_ln_firing_rate")
     plt.close()
-
-
 
 # connectivity matrix
 

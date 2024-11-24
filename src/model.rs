@@ -520,8 +520,8 @@ impl Network {
     const PN_LN_PROBABILITY: f64 = 0.3;
     const LN_PN_PROBABILITY: f64 = 0.25;
     const LN_LN_PROBABILITY: f64 = 0.25; // .25
-    const CROSS_PN_PN_PROBABILITY: f64 = 0.3;
-    const CROSS_PN_LN_PROBABILITY: f64 = 0.15;
+    const CROSS_PN_PN_PROBABILITY: f64 = 0.18;
+    const CROSS_PN_LN_PROBABILITY: f64 = 0.20;
     const CROSS_LN_PN_PROBABILITY: f64 = 0.10;
     const CROSS_LN_LN_PROBABILITY: f64 = 0.1;
     const SEED: u64 = 13478293478;
