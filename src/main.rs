@@ -9,14 +9,15 @@ use crate::model::{Config, Network, SerializedNetwork, DELTA_T};
 
 pub mod model;
 
-const DURATION: usize = 2500;
-const STIM_TIME: i32 = 500;
+const DURATION: usize = 3000;
+const STIM_TIME: i32 = 3000;
 const BIN_SIZE: usize = DURATION / 10;
 
 fn main() -> std::io::Result<()> {
     assert_eq!(DURATION % BIN_SIZE, 0);
     
     const STEPS: i32 = (DURATION as f64 / model::DELTA_T) as i32;
+    const SHOULD_SKIP_VALS: bool = true;
 
     let now = Instant::now();
     let mut t: f64 = 0.0;
@@ -35,6 +36,7 @@ fn main() -> std::io::Result<()> {
         model::NetworkType::Mech,
         [0, 1, 2, 3, 4, 5],
         DURATION,
+        SHOULD_SKIP_VALS,
     );
 
     let vals = Array::linspace(0f64, DURATION as f64, STEPS as usize);

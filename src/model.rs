@@ -75,13 +75,13 @@ impl Neuron {
     const TAU_V: f64 = 20.0; // leakage timescale
     const TAU_EXC: f64 = 2.0;
     const TAU_INH: f64 = 2.0;
-    const TAU_SLOW: f64 = 250.0;
-    const TAU_EXC_SLOW: f64 = 400.0;
+    const TAU_SLOW: f64 = 200.0;
+    const TAU_EXC_SLOW: f64 = 350.0;
     const TAU_STIM: f64 = 2.0;
     const TAU_DECAY: f64 = 384.0; 
     const TAU_SK: f64 = 250.0;
     const TAU_HALF_RISE_SK: f64 = 25.0;
-    const TAU_HALF_RISE_EXC: f64 = 25.0;
+    const TAU_HALF_RISE_EXC: f64 = 50.0;
     const STIMULUS_TAU_DECAY: f64 = 2.0;
     const TAU_REFRACTORY: f64 = 2.0;
     const BG_SPIKES_PER_MS: f64 = 3.6;
@@ -90,21 +90,21 @@ impl Neuron {
     const LAMBDA_MECH_MAX: f64 = 1.8;
     const HALF_LAMBDA_MECH_MAX: f64 = Neuron::LAMBDA_MECH_MAX * 0.5;
     const STIM_DURATION: f64 = 500.0;
-    const SK_MU: f64 = 0.5;
-    const SK_STDEV: f64 = 0.2;
+    const SK_MU: f64 = 0.50;
+    const SK_STDEV: f64 = 0.3; // MODIFIED from 0.2
     const LN_ODOR_TAU_RISE: f64 = 0.0;
     const LN_MECH_TAU_RISE: f64 = 150.0;
-    const LN_S_PN: f64 = 0.006*8.0;
-    const LN_S_PN_SLOW: f64 = 0.0;
+    const LN_S_PN: f64 = 0.006;
+    const LN_S_PN_SLOW: f64 = 0.008;
     const LN_S_INH: f64 = 0.015;
     const LN_S_SLOW: f64 = 0.04;
     const LN_S_STIM: f64 = 0.0031;
     const PN_ODOR_TAU_RISE: f64 = 35.0;
-    const PN_MECH_TAU_RISE: f64 = 0.0;
+    const PN_MECH_TAU_RISE: f64 = 300.0;
     const PN_S_PN: f64 = 0.01;
-    const PN_S_PN_SLOW: f64 = 0.02*3.0;
+    const PN_S_PN_SLOW: f64 = 0.02*1.75;
     const PN_S_INH: f64 = 0.0169;
-    const PN_S_SLOW: f64 = 0.0338*1.5;
+    const PN_S_SLOW: f64 = 0.0338;
     const PN_S_STIM: f64 = 0.004 ;
 
     fn new(
@@ -343,7 +343,7 @@ impl Neuron {
         partition
     }
 
-    fn update(&mut self, rng: &RefCell<SmallRng>, t: f64) -> bool {
+    fn update(&mut self, rng: &RefCell<SmallRng>, t: f64, should_skip_values: bool) -> bool {
         if self.refractory_counter > 0f64 {
             self.refractory_counter -= DELTA_T;
         } else {
@@ -355,7 +355,7 @@ impl Neuron {
                 self.refractory_counter = Neuron::TAU_REFRACTORY;
                 self.t += DELTA_T;
 
-                if self.count % 10 == 0 {
+                if !should_skip_values || self.count % 10 == 0 {
                     self.record_values();
                 }
 
@@ -428,7 +428,7 @@ impl Neuron {
                 .collect();
         }
 
-        if self.count % 10 == 0 {
+        if !should_skip_values || self.count % 10 == 0  {
             self.record_values();
         }
 
@@ -469,6 +469,7 @@ struct SerializedNeuron {
     slow_inhibition_vals: Vec<f64>,
     g_sk_vals: Vec<f64>,
     spike_times: Vec<f64>,
+    spike_counts: Vec<usize>,
     stim_vals: Vec<f64>,
     dv_dt_vals: Vec<f64>,
 }
@@ -488,6 +489,7 @@ impl SerializedNeuron {
             slow_inhibition_vals: neuron.g_slow_vals.clone(),
             g_sk_vals: neuron.g_sk_vals.clone(),
             spike_times: neuron.spike_times.clone(),
+            spike_counts: neuron.spike_counts.clone(),
             stim_vals: neuron.g_stim_vals.clone(),
             dv_dt_vals: neuron.dv_dt_vals.clone(),
         }
@@ -506,6 +508,7 @@ pub(crate) struct Network {
     pub connectivity_matrix: [Vec<usize>; 96],
     rng: RefCell<SmallRng>,
     t: f64,
+    should_skip_vals: bool,
 }
 
 
@@ -515,11 +518,11 @@ impl Network {
     const NUM_LNS: usize = 12;
     const PN_PN_PROBABILITY: f64 = 0.4; // MODIFIED: originally 0.75
     const PN_LN_PROBABILITY: f64 = 0.3;
-    const LN_PN_PROBABILITY: f64 = 0.35;
+    const LN_PN_PROBABILITY: f64 = 0.25;
     const LN_LN_PROBABILITY: f64 = 0.25; // .25
-    const CROSS_PN_PN_PROBABILITY: f64 = 0.2;
+    const CROSS_PN_PN_PROBABILITY: f64 = 0.3;
     const CROSS_PN_LN_PROBABILITY: f64 = 0.15;
-    const CROSS_LN_PN_PROBABILITY: f64 = 0.15;
+    const CROSS_LN_PN_PROBABILITY: f64 = 0.10;
     const CROSS_LN_LN_PROBABILITY: f64 = 0.1;
     const SEED: u64 = 13478293478;
     pub(crate) fn new(
@@ -527,6 +530,7 @@ impl Network {
         network_type: NetworkType,
         affected_glomeruli: [i8; 6],
         duration: usize,
+        should_skip_vals: bool,
     ) -> Self {
         let rng_struct: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(Network::SEED));
 
@@ -623,13 +627,14 @@ impl Network {
             connectivity_matrix,
             rng: rng_struct,
             t: 0.0,
+            should_skip_vals,
         }
     }
 
     pub(crate) fn update(&mut self, t: f64) {
         let mut spiked_neurons: Vec<usize> = Vec::new();
         for (i, neuron) in &mut self.neurons.iter_mut().enumerate() {
-            if neuron.update(&self.rng, t) {
+            if neuron.update(&self.rng, t, self.should_skip_vals) {
                 spiked_neurons.push(i);
             }
         }
@@ -664,6 +669,7 @@ pub struct SerializedNetwork {
     stim_time: i32,
     duration: usize,
     delta_t: f64,
+    skipped_vals: bool,
 }
 
 impl SerializedNetwork {
@@ -680,6 +686,7 @@ impl SerializedNetwork {
             stim_time: STIM_TIME,
             duration: DURATION,
             delta_t: DELTA_T,
+            skipped_vals: network.should_skip_vals,
         }
     }
 }
