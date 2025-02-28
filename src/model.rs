@@ -74,15 +74,14 @@ impl Neuron {
     const V_THRES: f64 = 1.0;
     const TAU_V: f64 = 20.0; // leakage timescale
     const TAU_EXC: f64 = 2.0;
-    const TAU_INH: f64 = 2.0;
-    const TAU_SLOW: f64 = 200.0;
-    const TAU_EXC_SLOW: f64 = 350.0;
+    const TAU_INH: f64 = 20.0;
+    const TAU_SLOW: f64 = 350.0*0.1;
+    const TAU_EXC_SLOW: f64 = 450.0;
     const TAU_STIM: f64 = 2.0;
-    const TAU_DECAY: f64 = 384.0; 
+    const TAU_DECAY: f64 = 300.0; 
     const TAU_SK: f64 = 250.0;
     const TAU_HALF_RISE_SK: f64 = 25.0;
-    const TAU_HALF_RISE_EXC: f64 = 50.0;
-    const STIMULUS_TAU_DECAY: f64 = 2.0;
+    const TAU_HALF_RISE_EXC: f64 = 150.0;
     const TAU_REFRACTORY: f64 = 2.0;
     const BG_SPIKES_PER_MS: f64 = 3.6;
     const LAMBDA_ODOR_MAX: f64 = 3.6;
@@ -91,21 +90,21 @@ impl Neuron {
     const HALF_LAMBDA_MECH_MAX: f64 = Neuron::LAMBDA_MECH_MAX * 0.5;
     const STIM_DURATION: f64 = 500.0;
     const SK_MU: f64 = 0.50;
-    const SK_STDEV: f64 = 0.3; // MODIFIED from 0.2
+    const SK_STDEV: f64 = 0.2;
     const LN_ODOR_TAU_RISE: f64 = 0.0;
-    const LN_MECH_TAU_RISE: f64 = 150.0;
+    const LN_MECH_TAU_RISE: f64 = 0.0;
     const LN_S_PN: f64 = 0.006;
-    const LN_S_PN_SLOW: f64 = 0.008;
-    const LN_S_INH: f64 = 0.015;
+    const LN_S_PN_SLOW: f64 = 0.0;
+    const LN_S_INH: f64 = 0.015*1.5;
     const LN_S_SLOW: f64 = 0.04;
-    const LN_S_STIM: f64 = 0.0031;
+    const LN_S_STIM: f64 = 0.0031*1.3;
     const PN_ODOR_TAU_RISE: f64 = 35.0;
-    const PN_MECH_TAU_RISE: f64 = 300.0;
+    const PN_MECH_TAU_RISE: f64 = 1000.0;
     const PN_S_PN: f64 = 0.01;
-    const PN_S_PN_SLOW: f64 = 0.02;
-    const PN_S_INH: f64 = 0.0169;
-    const PN_S_SLOW: f64 = 0.0338;
-    const PN_S_STIM: f64 = 0.004 ;
+    const PN_S_PN_SLOW: f64 = 0.0;
+    const PN_S_INH: f64 = 0.0169*1.5;
+    const PN_S_SLOW: f64 = 0.0338*3.0;
+    const PN_S_STIM: f64 = 0.004*1.25;
 
     fn new(
         t_stim_on: f64,
@@ -158,6 +157,7 @@ impl Neuron {
             Neuron::LN_S_STIM
         };
         let num_iterations = (duration as f64 * DELTA_T) as usize;
+        
         Neuron {
             stim_times: Vec::new(),
             lambda_vals: Vec::with_capacity(num_iterations),
@@ -266,7 +266,7 @@ impl Neuron {
     }
 
     fn odor_dyn(&self) -> f64 {
-        if self.neuron_type == PN {
+        if self.neuron_type != PN {
             if self.t <= self.t_stim_on + 2.0 * self.odor_tau_rise {
                 let heaviside_term = Neuron::heaviside(self.t - self.t_stim_on);
                 let sigmoid_term_num = E.powf(
@@ -291,27 +291,19 @@ impl Neuron {
     }
 
     fn mech_dyn(&self) -> f64 {
-        if self.neuron_type == PN {
-            if self.t <= self.t_stim_off {
-                Neuron::heaviside(self.t - self.t_stim_on) as f64
-            } else {
-                E.powf(-(self.t - self.t_stim_off) / Neuron::TAU_DECAY)
-            }
+        if self.t <= self.t_stim_on + 2.0 * self.mech_tau_rise {
+            let heaviside_term = Neuron::heaviside(self.t - self.t_stim_on);
+            let sigmoid_term_num = E.powf(
+                (5.0 * ((self.t - self.t_stim_on) - self.mech_tau_rise)) / self.mech_tau_rise,
+            );
+            let sigmoid_term_den = 1.0 + sigmoid_term_num;
+            heaviside_term as f64 * sigmoid_term_num / sigmoid_term_den
+        } else if self.t_stim_on + 2.0 * self.mech_tau_rise < self.t
+            && self.t <= self.t_stim_off
+        {
+            1.0
         } else {
-            if self.t <= self.t_stim_on + 2.0 * self.mech_tau_rise {
-                let heaviside_term = Neuron::heaviside(self.t - self.t_stim_on);
-                let sigmoid_term_num = E.powf(
-                    (5.0 * ((self.t - self.t_stim_on) - self.mech_tau_rise)) / self.mech_tau_rise,
-                );
-                let sigmoid_term_den = 1.0 + sigmoid_term_num;
-                heaviside_term as f64 * sigmoid_term_num / sigmoid_term_den
-            } else if self.t_stim_on + 2.0 * self.mech_tau_rise < self.t
-                && self.t <= self.t_stim_off
-            {
-                1.0
-            } else {
-                E.powf(-(self.t - self.t_stim_off) / Neuron::TAU_DECAY)
-            }
+            E.powf(-(self.t - self.t_stim_off) / Neuron::TAU_DECAY)
         }
     }
 
@@ -368,7 +360,7 @@ impl Neuron {
             self.lambda_vals.push(lamb_);
             let int_val: usize = lamb_.trunc() as usize;
             self.stim_times.extend((0..int_val).map(|_| t));
-            if rng.borrow_mut().gen_bool(lamb_ - int_val as f64) {
+            if rng.borrow_mut().gen_bool((lamb_ - int_val as f64).abs()) {
                 self.stim_times.push(t)
             }
             self.g_exc = self.g_gen(self.s_exc, Neuron::TAU_EXC, &self.excitation_times);
@@ -516,15 +508,17 @@ pub(crate) struct Network {
 impl Network {
     const NUM_PNS: usize = 4;
     const NUM_LNS: usize = 12;
-    const PN_PN_PROBABILITY: f64 = 0.4; // MODIFIED: originally 0.75
-    const PN_LN_PROBABILITY: f64 = 0.3;
-    const LN_PN_PROBABILITY: f64 = 0.25;
-    const LN_LN_PROBABILITY: f64 = 0.25; // .25
-    const CROSS_PN_PN_PROBABILITY: f64 = 0.18;
-    const CROSS_PN_LN_PROBABILITY: f64 = 0.20;
-    const CROSS_LN_PN_PROBABILITY: f64 = 0.10;
-    const CROSS_LN_LN_PROBABILITY: f64 = 0.1;
+    const PN_PN_PROBABILITY: f64 = 0.0; // MODIFIED from 0.6: originally 0.75
+    const PN_LN_PROBABILITY: f64 = 0.0; // Modufued from 0.45
+    const LN_PN_PROBABILITY: f64 = 0.0; // Modified from 0.5
+    const LN_LN_PROBABILITY: f64 = 0.0; // .25
+    const CROSS_PN_PN_PROBABILITY: f64 = 0.0;
+    const CROSS_PN_LN_PROBABILITY: f64 = 0.00;
+    const CROSS_LN_PN_PROBABILITY: f64 = 0.; // 0.10
+    const CROSS_LN_LN_PROBABILITY: f64 = 0.; // 0.25
     const SEED: u64 = 13478293478;
+    const STIM_FACTOR_MU: f64 = 1.5;
+    const STIM_FACTOR_STDEV: f64 = 0.35;
     pub(crate) fn new(
         stim_time: i32,
         network_type: NetworkType,
@@ -540,24 +534,28 @@ impl Network {
 
         for glom_index in 0..6 {
             let mut rng: RefMut<SmallRng> = rng_struct.borrow_mut();
-
+            let stim_factor: f64 = rng.sample(Normal::new(Network::STIM_FACTOR_MU, Network::STIM_FACTOR_STDEV).unwrap());
             // assign stimulus amounts based on network type and "glomerulus"
+            let ADJUSTED_ODOR = Neuron::LAMBDA_ODOR_MAX * stim_factor;
+            let ADJUSTED_MECH: f64 = Neuron::LAMBDA_MECH_MAX * stim_factor;
+
             let (odor_val, mech_val) = match network_type {
                 NetworkType::Odor => (
-                    Neuron::LAMBDA_ODOR_MAX
+                    ADJUSTED_ODOR
                         * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
                     0.0,
                 ),
-                NetworkType::Mech => (0.0, Neuron::LAMBDA_MECH_MAX),
+                NetworkType::Mech => (0.0, ADJUSTED_MECH),
                 NetworkType::Additive => (
-                    Neuron::LAMBDA_ODOR_MAX
+                    ADJUSTED_ODOR
                         * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
-                    Neuron::LAMBDA_MECH_MAX,
+                    ADJUSTED_MECH
                 ),
                 NetworkType::Normalized => (
                     Neuron::HALF_LAMBDA_ODOR_MAX
+                        *stim_factor
                         * affected_glomeruli.iter().filter(|&x| *x == glom_index).count() as f64,
-                    Neuron::HALF_LAMBDA_MECH_MAX,
+                    Neuron::HALF_LAMBDA_MECH_MAX*stim_factor,
                 ),
             };
 
@@ -614,7 +612,7 @@ impl Network {
                     (false, true) => if is_intra_glomerular {Network::LN_PN_PROBABILITY} else {Network::CROSS_LN_PN_PROBABILITY},
                     (false, false) => if is_intra_glomerular {Network::LN_LN_PROBABILITY} else {Network::CROSS_LN_LN_PROBABILITY}
                 };
-                if rand_val <= probability {
+                if (!is_intra_glomerular || neuron_relative_index != target_glomerular_index) && rand_val <= probability {
                     connectivity_matrix[neuron_index].push(target_index);
                 }
             }
@@ -758,7 +756,7 @@ impl Config {
             LN_S_SLOW: Neuron::LN_S_SLOW,
             LN_S_STIM: Neuron::LN_S_STIM,
             PN_ODOR_TAU_RISE: Neuron::PN_ODOR_TAU_RISE,
-            PN_MECH_TAU_RISE: Neuron::LN_MECH_TAU_RISE,
+            PN_MECH_TAU_RISE: Neuron::PN_MECH_TAU_RISE,
 
             PN_S_PN: Neuron::PN_S_PN,
             PN_S_PN_SLOW: Neuron::PN_S_PN_SLOW,
