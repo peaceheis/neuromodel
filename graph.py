@@ -100,19 +100,19 @@ x_vals = np.linspace(0, duration, num=int(duration / (delta_t * (10 - 9 * (not s
 def generate_vals_graph(nrn, n_index):
     global x_vals
     plt.figure()
-    # plt.plot(x_vals, neuron.voltages, label="voltage")
-    # plt.plot(x_vals, neuron.dv_dt_vals, label="dv dt")
+    # plt.plot(x_vals, nrn.voltages, label="voltage")
+    # plt.plot(x_vals, nrn.dv_dt_vals, label="dv dt")
     subtractive = nrn.inhibition_vals + nrn.slow_inhibition_vals
     additive = nrn.excitation_vals + nrn.slow_excitation_vals + nrn.stim_vals
-    # plt.plot(x_vals, neuron.slow_inhibition_vals, label="slow", alpha=0.7)
-    # plt.plot(x_vals, neuron.slow_excitation_vals, label="slow exc", alpha=0.6)
-    # plt.plot(x_vals, neuron.inhibition_vals, label="inh", alpha=0.5)
-    # plt.plot(x_vals, neuron.excitation_vals, label="exc", alpha=0.5)
-    # plt.plot(x_vals, neuron.stim_vals, label="stim", alpha=0.5)
-    # plt.plot(x_vals, neuron.g_sk_vals, label="sk", alpha=0.4)
-    plt.plot(x_vals, additive, label="add", alpha=0.75)
-    plt.plot(x_vals, subtractive, label="sub", alpha=0.3)
-    plt.plot(x_vals, additive - subtractive, label="total", alpha=0.5)
+    plt.plot(x_vals, nrn.slow_inhibition_vals, label="slow", alpha=0.7, color="pink")
+    # plt.plot(x_vals, nrn.slow_excitation_vals, label="slow exc", alpha=0.6, color="green")
+    plt.plot(x_vals, nrn.inhibition_vals, label="inh", alpha=0.5, color="red")
+    # plt.plot(x_vals, nrn.excitation_vals, label="exc", alpha=0.5)
+    plt.plot(x_vals, nrn.stim_vals, label="stim", alpha=0.4, color="green")
+    # plt.plot(x_vals, nrn.g_sk_vals, label="sk", alpha=0.4)
+    plt.plot(x_vals, additive, label="add", alpha=0.5, color="orange")
+    plt.plot(x_vals, subtractive, label="sub", alpha=0.5, color="blue")
+    plt.plot(x_vals, additive - subtractive, label="total", alpha=0.6, color="purple")
     plt.legend()
     plt.savefig(f"{output_dir}/neuron_{n_index}_{nrn.type}_values")
     plt.close()
@@ -126,7 +126,7 @@ generate_vals_graph(neuron_1, neuron_num)
 
 def generate_firing_rate_graph(nrn, n_index):
     plt.figure()
-    plt.plot((nrn.spike_counts[300:] - nrn.spike_counts[:-300])*1000 / 300)
+    plt.plot((nrn.spike_counts[50:] - nrn.spike_counts[:-50])*1000 / 50)
     plt.title(f"Neuron {i * 16 + n_index} ({nrn.type}) Firing Rate")
     plt.savefig(f"{output_dir}/hist_{nrn.type}_{i * 16 + n_index}")
     plt.close()
@@ -145,10 +145,11 @@ for i in range(6):
 
     plt.figure()
     nrns = glomeruli[i].neurons
-    nrn_sum = nrns[NUM_PNS].spike_counts
+    nrn_sum = nrns[NUM_PNS - 1].spike_counts
 
     for j in range(NUM_PNS):
         nrn_sum += nrns[j].spike_counts
+        print(nrns[j].spike_counts, j)
     print(i)
     nrn_sum = nrn_sum * 1000 / NUM_PNS
     plt.plot(x_vals[300:], (nrn_sum[300:] - nrn_sum[:-300]) / 300)
