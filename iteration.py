@@ -19,17 +19,19 @@ def generate_spike_count_histogram(nrn, n_index, i, num_runs, output_dir="output
         spike_data[neuron_key] = []
 
     # Store new spike counts
-    spike_data[neuron_key].append(nrn.spike_counts)
-
+    spike_data[neuron_key].append(nrn.firing_rates)
+    if len(spike_data[neuron_key]) < num_runs:
+        print(f"Waiting for {num_runs - len(spike_data[neuron_key])} more runs...")
+        return  # Skip plotting until we have enough trials
     # average spike counts across stored runs for the individual neuron
     all_trials = np.array(spike_data[neuron_key])
     avg_spike_counts = np.mean(all_trials, axis=0)  # mean over trials
 
     # histogram
     plt.figure()
-    plt.hist(avg_spike_counts, bins=20, alpha=0.75, color='blue', edgecolor='black')
-    plt.xlabel("Spike Count")
-    plt.ylabel("Frequency")
+    plt.hist(all_trials, bins=20, alpha=0.75, color='blue', edgecolor='black')
+    plt.xlabel("Time (mS)") #was originally labeled spike counts...might be wrong
+    plt.ylabel("Firing rate") # was originally labeled frequency
     plt.title(f"Neuron {i * 16 + n_index} ({nrn.type}) Average Spike Count Histogram")
 
     # Save figure

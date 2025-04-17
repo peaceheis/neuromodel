@@ -9,8 +9,8 @@ use crate::model::{Config, Network, SerializedNetwork, DELTA_T};
 
 pub mod model;
 
-const DURATION: usize = 2000;
-const STIM_TIME: i32 = 500;
+const DURATION: usize = 200;
+const STIM_TIME: i32 = 100;
 const BIN_SIZE: usize = DURATION / 10;
 
 fn main() -> std::io::Result<()> {

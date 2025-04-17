@@ -152,7 +152,7 @@ for i in range(6):
         print(nrns[j].spike_counts, j)
     print(i)
     nrn_sum = nrn_sum * 1000 / NUM_PNS
-    plt.plot(x_vals[300:], (nrn_sum[300:] - nrn_sum[:-300]) / 300)
+    plt.plot(x_vals[100:], (nrn_sum[100:] - nrn_sum[:-100]) / 300)
     plt.title(f"Glomerulus {i} Continuous PN Firing Rate")
     plt.ylabel("Firing Rate, Hz")
     plt.savefig(f"{output_dir}/glom_{i}_pn_firing_rate")
