@@ -1,18 +1,21 @@
 use std::cell::{RefCell, RefMut};
 use std::cmp::PartialEq;
 use std::f64::consts::E;
+use std::time::{SystemTime, UNIX_EPOCH};
 use ndarray::Array;
 use ndarray_rand::RandomExt;
 use ndarray_rand::rand_distr::Uniform;
 
-use rand::distributions::{DistIter, Standard};
-use rand::Rng;
+use ndarray_rand::rand::distributions::{DistIter, Standard};
+use ndarray_rand::rand::RngCore;
+use rand::{Rng, SeedableRng};
 use rand::rngs::SmallRng;
 use rand_distr::{Distribution, Normal};
+use rand_isaac::Isaac64Rng;
 use serde::Serialize;
 use vec_to_array::vec_to_array;
 
-use crate::{DURATION, STIM_TIME};
+use crate::{BIN_SIZE, DURATION, STIM_TIME};
 use crate::model::NeuronType::PN;
 
 pub(crate) const DELTA_T: f64 = 0.1;
@@ -83,12 +86,12 @@ impl Neuron {
     const TAU_HALF_RISE_SK: f64 = 25.0;
     const TAU_HALF_RISE_EXC: f64 = 150.0;
     const TAU_REFRACTORY: f64 = 2.0;
-    const BG_SPIKES_PER_MS: f64 = 3.6;
+    const BG_SPIKES_PER_MS: f64 = 4.0; // 3.6
     const LAMBDA_ODOR_MAX: f64 = 3.6;
     const HALF_LAMBDA_ODOR_MAX: f64 = Neuron::LAMBDA_ODOR_MAX * 0.5;
     const LAMBDA_MECH_MAX: f64 = 1.8;
     const HALF_LAMBDA_MECH_MAX: f64 = Neuron::LAMBDA_MECH_MAX * 0.5;
-    const STIM_DURATION: f64 = 500.0;
+    const STIM_DURATION: f64 = 750.0;
     const SK_MU: f64 = 0.50;
     const SK_STDEV: f64 = 0.2;
     const LN_ODOR_TAU_RISE: f64 = 0.0;
@@ -99,19 +102,19 @@ impl Neuron {
     const LN_S_SLOW: f64 = 0.04;
     const LN_S_STIM: f64 = 0.0031*1.3;
     const PN_ODOR_TAU_RISE: f64 = 35.0;
-    const PN_MECH_TAU_RISE: f64 = 1000.0;
+    const PN_MECH_TAU_RISE: f64 = 150.0;
     const PN_S_PN: f64 = 0.01;
     const PN_S_PN_SLOW: f64 = 0.0;
-    const PN_S_INH: f64 = 0.0169*1.5;
-    const PN_S_SLOW: f64 = 0.0338*3.0;
-    const PN_S_STIM: f64 = 0.004*1.25;
+    const PN_S_INH: f64 = 0.0169*1.5; // from *1.5
+    const PN_S_SLOW: f64 = 0.0338*4.8; // from 3.0
+    const PN_S_STIM: f64 = 0.004*1.15;
 
     fn new(
         t_stim_on: f64,
         lambda_odor: f64,
         lambda_mech: f64,
         neuron_type: NeuronType,
-        rng: &mut SmallRng,
+        s_sk: f64,
         duration: usize,
     ) -> Self {
         let odor_tau_rise = if neuron_type == PN {
@@ -143,12 +146,6 @@ impl Neuron {
             Neuron::PN_S_SLOW
         } else {
             Neuron::LN_S_SLOW
-        };
-
-        let s_sk = if neuron_type == PN {
-            rng.sample(Normal::new(Neuron::SK_MU, Neuron::SK_STDEV).unwrap())
-        } else {
-            0.0
         };
 
         let s_stim = if neuron_type == PN {
@@ -314,9 +311,9 @@ impl Neuron {
         Neuron::BG_SPIKES_PER_MS + (self.lambda_odor * odor) + (self.lambda_mech * mech)
     }
 
-    fn partition_spike_times(&self, duration: i8, bin_size: i8) -> Vec<Vec<f64>> {
+    fn partition_spike_times(&self, duration: usize, bin_size: usize) -> Vec<Vec<f64>> {
         let mut partition: Vec<Vec<f64>>;
-        partition = (1..duration / bin_size).map(|_| Vec::new()).collect();
+        partition = (0..duration / bin_size).map(|_| Vec::new()).collect();
 
         // fill bins
 
@@ -441,11 +438,12 @@ impl Neuron {
         self.dv_dt_vals.push(self.dv_dt);
     }
 
-    fn generate_firing_rates(self, duration: i8, bin_size: i8) -> Vec<f64> {
-        let mut rates: Vec<f64> = Vec::new();
+    fn generate_spike_counts(&self, duration: usize, bin_size: usize) -> Vec<usize> {
+        let mut rates: Vec<usize> = Vec::new();
         let partition = self.partition_spike_times(duration, bin_size);
+        println!("HERE RIGHT HERE IS PARTITION {:?}", partition);
         for bin_ in partition {
-            rates.push((bin_.len() / (bin_size as usize)) as f64)
+            rates.push(bin_.len())
         }
         rates
     }
@@ -461,7 +459,7 @@ struct SerializedNeuron {
     slow_inhibition_vals: Vec<f64>,
     g_sk_vals: Vec<f64>,
     spike_times: Vec<f64>,
-    spike_counts: Vec<usize>,
+    binned_spike_counts: Vec<usize>,
     stim_vals: Vec<f64>,
     dv_dt_vals: Vec<f64>,
 }
@@ -481,7 +479,7 @@ impl SerializedNeuron {
             slow_inhibition_vals: neuron.g_slow_vals.clone(),
             g_sk_vals: neuron.g_sk_vals.clone(),
             spike_times: neuron.spike_times.clone(),
-            spike_counts: neuron.spike_counts.clone(),
+            binned_spike_counts: neuron.generate_spike_counts(DURATION, BIN_SIZE),
             stim_vals: neuron.g_stim_vals.clone(),
             dv_dt_vals: neuron.dv_dt_vals.clone(),
         }
@@ -508,15 +506,15 @@ pub(crate) struct Network {
 impl Network {
     const NUM_PNS: usize = 4;
     const NUM_LNS: usize = 12;
-    const PN_PN_PROBABILITY: f64 = 0.0; // MODIFIED from 0.6: originally 0.75
-    const PN_LN_PROBABILITY: f64 = 0.0; // Modufued from 0.45
-    const LN_PN_PROBABILITY: f64 = 0.0; // Modified from 0.5
-    const LN_LN_PROBABILITY: f64 = 0.0; // .25
+    const PN_PN_PROBABILITY: f64 = 0.6; 
+    const PN_LN_PROBABILITY: f64 = 0.45;
+    const LN_PN_PROBABILITY: f64 = 0.15; 
+    const LN_LN_PROBABILITY: f64 = 0.25; // .25
     const CROSS_PN_PN_PROBABILITY: f64 = 0.0;
     const CROSS_PN_LN_PROBABILITY: f64 = 0.00;
-    const CROSS_LN_PN_PROBABILITY: f64 = 0.; // 0.10
-    const CROSS_LN_LN_PROBABILITY: f64 = 0.; // 0.25
-    const SEED: u64 = 13478293478;
+    const CROSS_LN_PN_PROBABILITY: f64 = 0.05; // 0.10
+    const CROSS_LN_LN_PROBABILITY: f64 = 0.25; // 0.25
+    const CONNECTIVITY_MATRIX_SEED: u64 = 1237849378947291;
     const STIM_FACTOR_MU: f64 = 1.5;
     const STIM_FACTOR_STDEV: f64 = 0.35;
     pub(crate) fn new(
@@ -526,15 +524,18 @@ impl Network {
         duration: usize,
         should_skip_vals: bool,
     ) -> Self {
-        let rng_struct: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(Network::SEED));
-
+        let start = SystemTime::now();
+        let since_the_epoch = start
+            .duration_since(UNIX_EPOCH);
+        let mut rand_rng: RefCell<SmallRng> = RefCell::new(SmallRng::seed_from_u64(since_the_epoch.unwrap().as_millis() as u64));
+        let mut seeded_rng = SmallRng::seed_from_u64(Network::CONNECTIVITY_MATRIX_SEED); //TODO: technically not "portable"
+        
         let mut neurons_vec: Vec<Neuron> = Vec::new();
         const DUMMY_VEC: Vec<usize> = Vec::new();
         let mut connectivity_matrix: [Vec<usize>; 96] = [DUMMY_VEC; 96];
-
+        
         for glom_index in 0..6 {
-            let mut rng: RefMut<SmallRng> = rng_struct.borrow_mut();
-            let stim_factor: f64 = rng.sample(Normal::new(Network::STIM_FACTOR_MU, Network::STIM_FACTOR_STDEV).unwrap());
+            let stim_factor: f64 = seeded_rng.sample(Normal::new(Network::STIM_FACTOR_MU, Network::STIM_FACTOR_STDEV).unwrap());
             // assign stimulus amounts based on network type and "glomerulus"
             let ADJUSTED_ODOR = Neuron::LAMBDA_ODOR_MAX * stim_factor;
             let ADJUSTED_MECH: f64 = Neuron::LAMBDA_MECH_MAX * stim_factor;
@@ -566,7 +567,7 @@ impl Network {
                         odor_val,
                         mech_val,
                         NeuronType::PN,
-                        &mut rng,
+                        seeded_rng.sample(Normal::new(Neuron::SK_MU, Neuron::SK_STDEV).unwrap()),
                         duration,
                     ));
 
@@ -577,7 +578,7 @@ impl Network {
                         odor_val,
                         mech_val,
                         NeuronType::LN,
-                        &mut rng,
+                        seeded_rng.sample(Normal::new(Neuron::SK_MU, Neuron::SK_STDEV).unwrap()),
                         duration,
                     ));
                 }
@@ -587,7 +588,8 @@ impl Network {
         // build out connectivity matrix.
 
         // first, generate a 96 x 96 matrix of float values...
-        let (rand_vals, _) = Array::random((96, 96), Uniform::new(0.0, 1.0)).into_raw_vec_and_offset();
+        
+        let (rand_vals, _) = Array::random_using((96, 96), Uniform::new(0.0, 1.0), &mut seeded_rng).into_raw_vec_and_offset();
         // repackage values into slightly nicer form
         const DUMMY_ARR: [f64; 96] = [0.0; 96];
         let mut vals: [[f64; 96]; 96] = [DUMMY_ARR; 96];
@@ -623,7 +625,7 @@ impl Network {
         Network {
             neurons,
             connectivity_matrix,
-            rng: rng_struct,
+            rng: rand_rng,
             t: 0.0,
             should_skip_vals,
         }
@@ -668,6 +670,8 @@ pub struct SerializedNetwork {
     connectivity_matrix: Vec<Vec<usize>>,
     stim_time: i32,
     duration: usize,
+    bin_size: usize,
+    num_bins: usize,
     delta_t: f64,
     skipped_vals: bool,
 }
@@ -687,6 +691,8 @@ impl SerializedNetwork {
             connectivity_matrix: network.connectivity_matrix.to_vec(),
             stim_time: STIM_TIME,
             duration: DURATION,
+            bin_size: BIN_SIZE,
+            num_bins: DURATION/BIN_SIZE as usize,
             delta_t: DELTA_T,
             skipped_vals: network.should_skip_vals,
         }

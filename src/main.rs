@@ -1,4 +1,5 @@
 use std::fs;
+use std::env;
 use std::fs::File;
 use std::io::Write;
 use std::time::Instant;
@@ -9,9 +10,9 @@ use crate::model::{Config, Network, SerializedNetwork, DELTA_T};
 
 pub mod model;
 
-const DURATION: usize = 2000;
-const STIM_TIME: i32 = 500;
-const BIN_SIZE: usize = DURATION / 10;
+const DURATION: usize = 1000;
+const STIM_TIME: i32 = 50;
+const BIN_SIZE: usize = DURATION / 5;
 
 fn main() -> std::io::Result<()> {
     assert_eq!(DURATION % BIN_SIZE, 0);
@@ -46,10 +47,7 @@ fn main() -> std::io::Result<()> {
         println!("{}", val);
         t += DELTA_T;
     }
-
-    for (i, neuron) in network.neurons.iter().enumerate() {
-        println!("{}, {}, {}", i, neuron.g_stim_vals.len(), neuron.count);
-    }
+    
     println!(
         "Simulated {} ms in {} seconds",
         DURATION,
