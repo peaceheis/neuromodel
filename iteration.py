@@ -1,39 +1,41 @@
-import json
-import random
-from dataclasses import dataclass
-import subprocess
-import matplotlib.pyplot as plt
-import numpy
-import numpy as np
 import os
+import subprocess
+from dataclasses import dataclass
+import json
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 spike_data = {}
-def generate_spike_count_histogram(nrn, n_index, i, num_runs, output_dir="output"):
+
+
+
+
+def neuron_key(nrn, n_index):
+    return f"{nrn.n_type}_{n_index}"
+
+
+def serialize_neuron(nrn, n_index, num_runs):
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
 
-    neuron_key = f"{nrn.type}_{i * 16 + n_index}"
-
-    # Initialize storage if neuron data doesn't exist
-    if neuron_key not in spike_data:
-        spike_data[neuron_key] = []
+    n_key = neuron_key(nrn, n_index)
 
     # Store new spike counts
-    spike_data[neuron_key].append(nrn.firing_rates)
-    if len(spike_data[neuron_key]) < num_runs:
-        print(f"Waiting for {num_runs - len(spike_data[neuron_key])} more runs...")
-        return  # Skip plotting until we have enough trials
-    # average spike counts across stored runs for the individual neuron
-    all_trials = np.array(spike_data[neuron_key])
-    avg_spike_counts = np.mean(all_trials, axis=0)  # mean over trials
+    spike_data[n_key] += nrn.binned_spike_counts
 
+
+def plot_trials(n_index, n_key, nrn, num_runs):
+    all_trials = np.array(spike_data.values())
+    all_trials /= num_runs
+    print(all_trials)
+    x = np.linspace(0, duration, num_bins)
     # histogram
     plt.figure()
-    plt.hist(all_trials, bins=20, alpha=0.75, color='blue', edgecolor='black')
-    plt.xlabel("Time (mS)") #was originally labeled spike counts...might be wrong
-    plt.ylabel("Firing rate") # was originally labeled frequency
-    plt.title(f"Neuron {i * 16 + n_index} ({nrn.type}) Average Spike Count Histogram")
-
+    plt.bar(x, all_trials, alpha=0.75, color='blue', edgecolor='black')
+    plt.ylabel("Firing Rate (Hz)")
+    plt.xlabel("Time (ms)")
+    plt.title(f"Neuron {n_index} ({nrn.n_type}) Average Spike Count Histogram")
     # Save figure
     plt.savefig(f"{output_dir}/histogram_{nrn.type}_{i * 16 + n_index}.png")
 
